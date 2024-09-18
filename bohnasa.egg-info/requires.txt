@@ -1,0 +1,7 @@
+setuptools
+numpy
+scipy
+numba
+jax
+matplotlib
+h5py

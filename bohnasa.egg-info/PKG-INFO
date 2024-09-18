@@ -1,0 +1,20 @@
+Metadata-Version: 2.1
+Name: bohnasa
+Version: 0.0.0
+Summary: A Python package for exact diagonalization tools in quantum many body systems
+Home-page: https://github.com/mattlST/bohnasa
+Author: Mathias Steinhuber
+Author-email: 157615034+mattlST@users.noreply.github.com
+Classifier: Development Status :: 1 - Planning
+Classifier: Intended Audience :: Science/Research
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Operating System :: POSIX :: Linux
+Classifier: Programming Language :: Python :: 3.9
+License-File: LICENSE
+Requires-Dist: setuptools
+Requires-Dist: numpy
+Requires-Dist: scipy
+Requires-Dist: numba
+Requires-Dist: jax
+Requires-Dist: matplotlib
+Requires-Dist: h5py

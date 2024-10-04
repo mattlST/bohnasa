@@ -37,7 +37,7 @@ def lanczos(sta,op,krylov_dim,beta_tol=1e-8):
         w = w - v.T@(v.conj()@w)        
         while True:
            wn = w - v.T@(v.conj()@w)
-           if (np.linalg.norm(wn-w))<1e-8:
+           if (np.linalg.norm(wn-w))<1e-12:
                w = wn
                break
            print("index", j,"norm of difference",np.linalg.norm(wn-w))

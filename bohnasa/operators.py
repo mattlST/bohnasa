@@ -83,3 +83,9 @@ class interaction(operator):
      def __init__(self,fock):
         super().__init__(fock)
         self.matrix = sp.diags(np.sum(fock.fockArray*(fock.fockArray-1),axis=1))
+
+
+class chemical_mu(operator):
+     def __init__(self,fock,mu):
+        super().__init__(fock)
+        self.matrix = sp.diags(np.sum(mu[None,:]*fock.fockArray,axis=1))

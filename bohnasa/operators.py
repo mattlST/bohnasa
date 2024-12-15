@@ -2,6 +2,7 @@ import numpy as np
 import scipy.sparse.linalg as spl
 import scipy.sparse as sp 
 import typing
+import copy
 
 class operator:
     def __init__(self,fock):
@@ -27,15 +28,48 @@ class operator:
             return np.asarray(self.matrix.todense()).reshape(-1)
         
     def __add__(self,A):
-        newOp = self
+        newOp = copy.deepcopy(self)
         newOp.matrix += A.matrix
         return newOp
+    def __mul__(self,r):
+        if isinstance(r,(float,complex,int)):
+            newOp = copy.deepcopy(self)
+            newOp.matrix *= r
+            return newOp        
     
 class number(operator):
     def __init__(self,fock,index):
         super().__init__(fock)
         self.index = index
         self.matrix = sp.diags(fock.fockArray[:,self.index])
+
+class correlator(operator):
+    def __init__(self,fock,index1,index2):
+        super().__init__(fock)
+
+        self.index1 = index1
+        self.index2 = index2
+        i_index = []
+        j_index = []
+        val = []
+        for ix,x in enumerate(fock.fockSpace):
+            #ix = fock.dict[x]
+            ay = np.array(x)
+            if ay[index1]==0:
+                continue
+            ay[index1] -= 1
+            ay[index2] += 1
+            y = tuple(ay) 
+            iy = fock.dict[y]
+            i_index += [ix]
+            j_index += [iy]
+            val += [np.sqrt(x[index1]*y[index2])]
+        i_index = np.array(i_index)
+        j_index = np.array(j_index)
+        val = np.array(val)
+        self.matrix = sp.coo_matrix((val,(j_index,i_index)),shape=(self.dim,self.dim)).tocsr()
+
+
     
 class hopping(operator):
     def __init__(self,fock,connections = 'pbc'):
@@ -43,14 +77,14 @@ class hopping(operator):
         L = self.L
         dim = self.dim
         
-        if (connections == 'pbc'):
+        if ((connections == 'pbc') or (connections == 'periodic')):
             indexPairs = np.array(list(zip(np.arange(L),np.roll(np.arange(L),1))))
-        elif (connections == 'obc'):
+        elif ((connections == 'obc') or (connections == 'open')):
             indexPairs = np.array(list(zip(np.arange(L-1),np.arange(1,L))))
         else: 
             indexPairs = np.array(connections)
             
-            assert (indexPairs.shape[1] ==2), f"connections must 'pbc', 'obc' or be 2d array with the shape (*,2), but the shape is {indexPairs.shape}"
+            assert (indexPairs.shape[1] ==2), f"connections must 'pbc' (periodic), 'obc' (open) or be 2d array with the shape (*,2), but the shape is {indexPairs.shape}"
             
         self.connections = indexPairs
 
@@ -89,3 +123,34 @@ class chemical_mu(operator):
      def __init__(self,fock,mu):
         super().__init__(fock)
         self.matrix = sp.diags(np.sum(mu[None,:]*fock.fockArray,axis=1))
+
+
+
+class correlator_m(operator):
+    def __init__(self,fock,index1,index2):
+        super().__init__(fock)
+
+        self.index1 = index1
+        self.index2 = index2
+        i_index = []
+        j_index = []
+        val = []
+        for ix,x in enumerate(fock.fockSpace):
+            #ix = fock.dict[x]
+            ay = np.array(x)
+            ay[index1] += 1
+            v = ay[index1]
+            if ay[index2]==0:
+                continue
+            v *= ay[index2]
+            ay[index2] -= 1
+    
+            y = tuple(ay) 
+            iy = fock.dict[y]
+            i_index += [ix]
+            j_index += [iy]
+            val += [np.sqrt(v)]
+        i_index = np.array(i_index)
+        j_index = np.array(j_index)
+        val = np.array(val)
+        self.matrix = sp.coo_matrix((val,(j_index,i_index)),shape=(self.dim,self.dim)).tocsr()

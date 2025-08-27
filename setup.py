@@ -9,7 +9,7 @@ setup(
     author_email='157615034+mattlST@users.noreply.github.com',
     packages=['bohnasa'],
     install_requires=['setuptools',
-                      'numpy',
+                      'numpy<=1.26.0 ',
                       'scipy',
                       'numba',
                       'jax',    

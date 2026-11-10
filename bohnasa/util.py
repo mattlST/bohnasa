@@ -1,14 +1,25 @@
+import logging
+
 import numpy as np
 import scipy.sparse as sp
+
 from . import operators
 
+logger = logging.getLogger(__name__)
+
+MAX_REORTH_ITERATIONS = 20
 
 
-def lanczos(sta,op,krylov_dim,beta_tol=1e-8):
+def lanczos(sta, op, krylov_dim, beta_tol=1e-8):
+    """Lanczos recursion with full reorthogonalization.
+
+    Returns the Krylov basis ``v`` (as rows) and the tridiagonal projection
+    ``T_m`` of the operator onto that basis.
+    """
 
     v = np.zeros((krylov_dim + 1, sta.shape[0]), dtype=complex)
-    T_m = np.zeros((krylov_dim+1,krylov_dim+1),dtype=complex)
-    v[0] = sta/np.linalg.norm(sta)
+    T_m = np.zeros((krylov_dim + 1, krylov_dim + 1), dtype=complex)
+    v[0] = sta / np.linalg.norm(sta)
 
     w_prime = op(v[0])
 
@@ -23,7 +34,7 @@ def lanczos(sta,op,krylov_dim,beta_tol=1e-8):
         beta = np.linalg.norm(w)
         if beta < beta_tol:
 
-            # Happy breakdown
+            # Happy breakdown: the Krylov space is exhausted.
             v_happy = v[0:j, :]
             T_m_happy = T_m[0:j, 0:j]
 
@@ -33,16 +44,24 @@ def lanczos(sta,op,krylov_dim,beta_tol=1e-8):
         w_prime = op(v[j, :])
         alpha = np.vdot(w_prime, v[j, :])
 
-        w = w_prime - alpha * v[j, :] - beta * v[j - 1, :] 
-        w = w - v.T@(v.conj()@w)        
-        while True:
-           wn = w - v.T@(v.conj()@w)
-           if (np.linalg.norm(wn-w))<1e-12:
-               w = wn
-               break
-           print("index", j,"norm of difference",np.linalg.norm(wn-w))
-           w = wn
-           print('repeat')
+        w = w_prime - alpha * v[j, :] - beta * v[j - 1, :]
+        w = w - v.T @ (v.conj() @ w)
+
+        for _ in range(MAX_REORTH_ITERATIONS):
+            wn = w - v.T @ (v.conj() @ w)
+            if np.linalg.norm(wn - w) < 1e-12:
+                w = wn
+                break
+            logger.debug(
+                "Lanczos reorthogonalization step %d at Krylov index %d, "
+                "residual %g", _, j, np.linalg.norm(wn - w)
+            )
+            w = wn
+        else:
+            raise RuntimeError(
+                f"Lanczos reorthogonalization did not converge within "
+                f"{MAX_REORTH_ITERATIONS} iterations at Krylov index {j}"
+            )
 
         T_m[j, j] = alpha
         T_m[j, j - 1] = beta
@@ -50,31 +69,31 @@ def lanczos(sta,op,krylov_dim,beta_tol=1e-8):
 
     return v, T_m
 
-def Krylov_complexity(fock,op,sta,numVec):
-    v, T_m = lanczos(sta,op,numVec)
+
+def Krylov_complexity(fock, op, sta, numVec):
+    v, T_m = lanczos(sta, op, numVec)
 
     krylov_op = operators.operator(fock)
-    krylov_op.matrix = sp.csr_matrix(v.conj().T@np.diag(np.arange(v.shape[0]))@v)
+    krylov_op.matrix = sp.csr_matrix(v.conj().T @ np.diag(np.arange(v.shape[0])) @ v)
     return krylov_op
 
-def time_evolution_exact_ind(H,state,time,observables):
-    if not hasattr(H,"eigval"):
-        eigval, eigvec = np.linalg.eigh(H.matrix.todense())
+
+def time_evolution_exact_ind(H, state, time, observables):
+    if not hasattr(H, "eigval"):
+        eigval, eigvec = np.linalg.eigh(H.matrix.toarray())
         H.eigval = np.asarray(eigval)
         H.eigvec = np.asarray(eigvec)
-    state = np.asarray(state,dtype=complex)
+    state = np.asarray(state, dtype=complex)
     state_eval = H.eigvec.T.conj() @ state
-    print(state.shape)
 
-    print(state_eval.shape)
-    dt = time[1]-time[0]
-    dE = np.exp(-1j *dt*H.eigval)
-    results_observables = np.zeros((len(observables),2,len(time)),dtype=float)
-    for iob,ob in enumerate(observables):
-        results_observables[iob,:,0] = ob.eval_mean_var(state)
-    for it,t in enumerate(time[:-1]):
+    dt = time[1] - time[0]
+    dE = np.exp(-1j * dt * H.eigval)
+    results_observables = np.zeros((len(observables), 2, len(time)), dtype=complex)
+    for iob, ob in enumerate(observables):
+        results_observables[iob, :, 0] = ob.eval_mean_var(state)
+    for it in range(len(time) - 1):
         state_eval *= dE
-        ret = H.eigvec@state_eval
-        for iob,ob in enumerate(observables):
-            results_observables[iob,:,it+1] = ob.eval_mean_var(ret)
+        ret = H.eigvec @ state_eval
+        for iob, ob in enumerate(observables):
+            results_observables[iob, :, it + 1] = ob.eval_mean_var(ret)
     return results_observables

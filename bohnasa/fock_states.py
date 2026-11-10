@@ -16,7 +16,6 @@ class fockStates_fixed_particle_number:
         return focklist
     def __wrapperFockGenerator(self,N,L):
         return ([tuple((*x,)) for x in np.array(self.__fockgenerator(N,L,L,(),())).reshape(-1,L)])
-        return (self.__fockgenerator(N,L,L,(),()))
     
 
     def __init__(self,N,L):

@@ -1,16 +1,5 @@
 import numpy as np 
 
-
-
-#def multinomial(lst):
-#    res, i = 1, sum(lst)
-#    i0 = lst.index(max(lst))
-#    for a in lst[:i0] + lst[i0+1:]:
-#        for j in range(1,a+1):
-#            res *= i
-#            res //= j
-#            i -= 1
-#    return res
 def multinomial(lst):
     res, i = 1, np.sum(lst)
     lst_sorted = np.sort(lst)[::-1]
@@ -34,7 +23,12 @@ def multinomial_sqrt(lst):
 def single_fockstate(fock,vec):
     N = fock.N
     L = fock.L
-    assert ((np.sum(vec)==N) and (vec.shape==(L,))), "wrong input vec"
+    vec = np.asarray(vec)
+    if vec.shape != (L,) or np.sum(vec) != N:
+        raise ValueError(
+            f"state vector must have shape ({L},) and particle number {N}, "
+            f"got shape {vec.shape} and sum {int(np.sum(vec))}"
+        )
     
     index = fock.dict[tuple(vec)]
 
@@ -44,11 +38,12 @@ def single_fockstate(fock,vec):
 
 def coherent_state_number_projected(fock,phi):
     L = fock.L
-    assert ((L == len(phi)) or (2*L == len(phi))), "wrong input sizes"
-    
-    if (len(phi) == 2*L):
+    phi = np.asarray(phi, dtype=complex)
+    if len(phi) == 2*L:
         phi = phi[:L] + 1j * phi[L:]
-    phi *= 1./np.linalg.norm(phi)
+    elif len(phi) != L:
+        raise ValueError(f"phi must have length {L} or {2*L}, got {len(phi)}")
+    phi = phi / np.linalg.norm(phi)
 
     #preCalMulti = np.array([np.sqrt(multinomial(x)) for x in fock.fockArray])
 

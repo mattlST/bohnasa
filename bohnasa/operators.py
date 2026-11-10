@@ -1,7 +1,5 @@
 import numpy as np 
-import scipy.sparse.linalg as spl
 import scipy.sparse as sp 
-import typing
 import copy
 import numbers
 
@@ -57,7 +55,7 @@ class number(operator):
     def __init__(self,fock,index):
         super().__init__(fock)
         self.index = index
-        self.matrix = sp.diags(fock.fockArray[:,self.index])
+        self.matrix = sp.diags(fock.fockArray[:,self.index], dtype=float)
 
 class correlator(operator):
     def __init__(self,fock,index1,index2):
@@ -99,8 +97,11 @@ class hopping(operator):
             indexPairs = np.array(list(zip(np.arange(L-1),np.arange(1,L))))
         else: 
             indexPairs = np.array(connections)
-            
-            assert (indexPairs.shape[1] ==2), f"connections must 'pbc' (periodic), 'obc' (open) or be 2d array with the shape (*,2), but the shape is {indexPairs.shape}"
+            if indexPairs.ndim != 2 or indexPairs.shape[1] != 2:
+                raise ValueError(
+                    "connections must be 'pbc' (periodic), 'obc' (open) or a 2d array "
+                    f"with the shape (*,2), but the shape is {indexPairs.shape}"
+                )
             
         self.connections = indexPairs
 
@@ -132,7 +133,7 @@ class hopping(operator):
 class interaction(operator):
      def __init__(self,fock):
         super().__init__(fock)
-        self.matrix = sp.diags(np.sum(fock.fockArray*(fock.fockArray-1),axis=1))
+        self.matrix = sp.diags(np.sum(fock.fockArray*(fock.fockArray-1),axis=1), dtype=float)
 
 
 class chemical_mu(operator):

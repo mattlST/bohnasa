@@ -1,9 +1,40 @@
+"""Fock-space basis for fixed total particle number."""
+
+# code from Jona Naegerl
 import numpy as np
 from math import comb
 
-# code from Jona Naegerl
+
 class FixedNFockSpace:
-    """Fock space with a fixed total particle number N over L sites."""
+    """Fock space with a fixed total particle number ``N`` over ``L`` sites.
+
+    Enumerates all occupation vectors ``(n_1, ..., n_L)`` with ``sum(n) = N``
+    in the order produced by the recursive generator, and builds the lookup
+    ``dict`` mapping each occupation tuple to its basis index.
+
+    Attributes
+    ----------
+    N : int
+        Total particle number.
+    L : int
+        Number of sites.
+    dim : int
+        Dimension ``comb(N + L - 1, L - 1)``.
+    fockSpace : list of tuple of int
+        Occupation vectors; ``fockSpace[i]`` is the ``i``-th basis state.
+    fockArray : numpy.ndarray of int, shape (dim, L)
+        Same states as a dense integer array.
+    dict : dict
+        ``{occupation tuple: basis index}``, the inverse of ``fockSpace``.
+
+    Examples
+    --------
+    >>> fock = FixedNFockSpace(2, 2)
+    >>> fock.dim
+    3
+    >>> fock.dict[(1, 1)]
+    1
+    """
 
     def __fockgenerator (self,n,l,L,focklist,fockSpaces):
         if l > 1:
@@ -17,7 +48,7 @@ class FixedNFockSpace:
             fockSpaces += focklist[-L:]
         return focklist
     def __wrapperFockGenerator(self,N,L):
-        return ([tuple((*x,)) for x in np.array(self.__fockgenerator(N,L,L,(),())).reshape(-1,L)])
+        return ([tuple(int(x) for x in state) for state in np.array(self.__fockgenerator(N,L,L,(),())).reshape(-1,L)])
     
 
     def __init__(self,N,L):
@@ -26,7 +57,7 @@ class FixedNFockSpace:
         self.dim = comb(N+L-1,L-1)
         self.fockSpace = self.__wrapperFockGenerator(N,L)
         self.fockArray = np.array(self.fockSpace,dtype=int)
-        self.dict = dict(zip(self.fockSpace,np.arange(self.dim)))
+        self.dict = dict(zip(self.fockSpace, range(self.dim)))
         
     def __call__(self):
         pass
@@ -36,5 +67,3 @@ class FixedNFockSpace:
 
 # Legacy alias for existing notebooks/scripts; to be dropped in Phase 5.
 fockStates_fixed_particle_number = FixedNFockSpace
-
-

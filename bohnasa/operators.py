@@ -8,7 +8,7 @@ class operator:
         self.L = fock.L
         self.N = fock.N
         self.dim = fock.dim
-        self.matrix = None #sp.zeros((self.fock_class.dim,self.fock_class),dtype=float)
+        self.matrix = None
     
     def __call__(self,state):
         return self.matrix@state
@@ -57,39 +57,49 @@ class number(operator):
         self.index = index
         self.matrix = sp.diags(fock.fockArray[:,self.index], dtype=float)
 
-class correlator(operator):
-    def __init__(self,fock,index1,index2):
-        super().__init__(fock)
+def _pair_matrix(fock, src, dst):
+    """Sparse matrix of the transition operator c^dag_dst c_src.
 
+    Built in the fixed-N Fock basis with rows = output states,
+    cols = input states, amplitudes sqrt(n_src * (n_dst + 1)).
+    """
+    rows = []
+    cols = []
+    vals = []
+    for x in fock.fockSpace:
+        n_src = x[src]
+        if n_src == 0:
+            continue
+        occ = list(x)
+        occ[src] -= 1
+        occ[dst] += 1
+        vals.append(np.sqrt(n_src * occ[dst]))
+        rows.append(fock.dict[tuple(occ)])
+        cols.append(fock.dict[x])
+    if not rows:
+        return sp.csr_matrix((fock.dim, fock.dim), dtype=float)
+    return sp.coo_matrix(
+        (np.array(vals), (np.array(rows), np.array(cols))),
+        shape=(fock.dim, fock.dim),
+    ).tocsr()
+
+
+class correlator(operator):
+    """c^dag_index2 c_index1: annihilate a particle at index1, create at index2."""
+
+    def __init__(self, fock, index1, index2):
+        super().__init__(fock)
         self.index1 = index1
         self.index2 = index2
-        i_index = []
-        j_index = []
-        val = []
-        for ix,x in enumerate(fock.fockSpace):
-            #ix = fock.dict[x]
-            ay = np.array(x)
-            if ay[index1]==0:
-                continue
-            ay[index1] -= 1
-            ay[index2] += 1
-            y = tuple(ay) 
-            iy = fock.dict[y]
-            i_index += [ix]
-            j_index += [iy]
-            val += [np.sqrt(x[index1]*y[index2])]
-        i_index = np.array(i_index)
-        j_index = np.array(j_index)
-        val = np.array(val)
-        self.matrix = sp.coo_matrix((val,(j_index,i_index)),shape=(self.dim,self.dim)).tocsr()
+        self.matrix = _pair_matrix(fock, index1, index2)
 
 
-    
 class hopping(operator):
+    """Sum of (c^dag_j c_i + h.c.) over the connection pairs (i, j)."""
+
     def __init__(self,fock,connections = 'pbc'):
         super().__init__(fock)
         L = self.L
-        dim = self.dim
         
         if ((connections == 'pbc') or (connections == 'periodic')):
             indexPairs = np.array(list(zip(np.arange(L),np.roll(np.arange(L),1))))
@@ -105,29 +115,10 @@ class hopping(operator):
             
         self.connections = indexPairs
 
-        i_index = []
-        j_index = []
-        val = []
-        for x in fock.fockSpace:
-            ix = fock.dict[x]
-
-            for index1,index2 in indexPairs:
-                ay = np.array(x)
-                if ay[index1] ==0:
-                    continue
-                ay[index1] -= 1
-                ay[index2] += 1
-                y = tuple(ay) 
-                iy = fock.dict[y]
-                i_index += [ix]
-                j_index += [iy]
-                val += [np.sqrt(x[index1]*y[index2])]
-        i_index = np.array(i_index)
-        j_index = np.array(j_index)
-        val = np.array(val)
-
-        hopping = sp.coo_matrix((val,(i_index,j_index)),shape=(dim,dim)).tocsr()
-        self.matrix = hopping+hopping.T
+        T = sp.csr_matrix((self.dim, self.dim), dtype=float)
+        for index1, index2 in indexPairs:
+            T = T + _pair_matrix(fock, index1, index2)
+        self.matrix = T + T.T
 
 
 class interaction(operator):
@@ -144,30 +135,10 @@ class chemical_mu(operator):
 
 
 class correlator_m(operator):
-    def __init__(self,fock,index1,index2):
-        super().__init__(fock)
+    """c^dag_index1 c_index2: annihilate a particle at index2, create at index1."""
 
+    def __init__(self, fock, index1, index2):
+        super().__init__(fock)
         self.index1 = index1
         self.index2 = index2
-        i_index = []
-        j_index = []
-        val = []
-        for ix,x in enumerate(fock.fockSpace):
-            #ix = fock.dict[x]
-            ay = np.array(x)
-            ay[index1] += 1
-            v = ay[index1]
-            if ay[index2]==0:
-                continue
-            v *= ay[index2]
-            ay[index2] -= 1
-    
-            y = tuple(ay) 
-            iy = fock.dict[y]
-            i_index += [ix]
-            j_index += [iy]
-            val += [np.sqrt(v)]
-        i_index = np.array(i_index)
-        j_index = np.array(j_index)
-        val = np.array(val)
-        self.matrix = sp.coo_matrix((val,(j_index,i_index)),shape=(self.dim,self.dim)).tocsr()
+        self.matrix = _pair_matrix(fock, index2, index1)

@@ -147,6 +147,11 @@ class ChemicalPotential(Operator):
 
     def __init__(self, fock, mu):
         super().__init__(fock)
+        mu = np.asarray(mu, dtype=float)
+        if mu.shape != (self.L,):
+            raise ValueError(
+                f"mu must have shape ({self.L},) for {self.L} sites, got {mu.shape}"
+            )
         self.matrix = sp.diags(np.sum(mu[None, :] * fock.fockArray, axis=1))
 
 

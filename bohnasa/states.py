@@ -36,7 +36,12 @@ def single_fockstate(fock,vec):
     sta_vec[index] = 1.
     return sta_vec
 
-def coherent_state_number_projected(fock,phi):
+def fixed_n_coherent_state(fock, phi):
+    """Projection of a coherent state onto the fixed-N sector of ``fock``.
+
+    ``phi`` holds the mode amplitudes (length L, or length 2L interpreted as
+    real and imaginary parts) and is normalized internally.
+    """
     L = fock.L
     phi = np.asarray(phi, dtype=complex)
     if len(phi) == 2*L:
@@ -49,3 +54,7 @@ def coherent_state_number_projected(fock,phi):
 
     preCalMulti = np.array([(multinomial_sqrt(x)) for x in fock.fockArray])
     return np.prod(phi[None,:]**fock.fockArray,axis=1) * preCalMulti
+
+
+# Legacy alias for existing notebooks/scripts; to be dropped in Phase 5.
+coherent_state_number_projected = fixed_n_coherent_state

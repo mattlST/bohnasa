@@ -149,6 +149,18 @@ def test_eval_mean_var_consistency(fock53):
     assert np.isclose(var, np.vdot(psi, a2) - mean**2)
 
 
+def test_legacy_aliases_are_the_same_objects():
+    assert bohnasa.fockStates_fixed_particle_number is bohnasa.FixedNFockSpace
+    assert bohnasa.operator is bohnasa.Operator
+    assert bohnasa.number is bohnasa.Number
+    assert bohnasa.correlator is bohnasa.Correlator
+    assert bohnasa.hopping is bohnasa.Hopping
+    assert bohnasa.interaction is bohnasa.Interaction
+    assert bohnasa.chemical_mu is bohnasa.ChemicalPotential
+    assert bohnasa.coherent_state_number_projected is bohnasa.fixed_n_coherent_state
+    assert bohnasa.Krylov_complexity is bohnasa.krylov_complexity
+
+
 def test_operator_addition(fock53):
     a = bohnasa.number(fock53, 0)
     b = bohnasa.number(fock53, 1)

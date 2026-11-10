@@ -2,7 +2,9 @@ import numpy as np
 from math import comb
 
 # code from Jona Naegerl
-class fockStates_fixed_particle_number:
+class FixedNFockSpace:
+    """Fock space with a fixed total particle number N over L sites."""
+
     def __fockgenerator (self,n,l,L,focklist,fockSpaces):
         if l > 1:
             for m in range(0,n+1):
@@ -30,5 +32,9 @@ class fockStates_fixed_particle_number:
         pass
     def __str__(self):
         return f"particle number: {self.N} \n site number: {self.L}\n dimension: {self.dim} "
+
+
+# Legacy alias for existing notebooks/scripts; to be dropped in Phase 5.
+fockStates_fixed_particle_number = FixedNFockSpace
 
 

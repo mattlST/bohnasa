@@ -3,7 +3,8 @@ import scipy.sparse as sp
 import copy
 import numbers
 
-class operator:
+class Operator:
+    """A quantum operator represented as a sparse matrix in a FixedNFockSpace basis."""
     def __init__(self,fock):
         self.L = fock.L
         self.N = fock.N
@@ -28,14 +29,14 @@ class operator:
         return np.asarray(self.matrix.todense()).reshape(-1)
 
     def __add__(self, other):
-        if not isinstance(other, operator):
+        if not isinstance(other, Operator):
             return NotImplemented
         newOp = copy.deepcopy(self)
         newOp.matrix = self.matrix + other.matrix
         return newOp
 
     def __sub__(self, other):
-        if not isinstance(other, operator):
+        if not isinstance(other, Operator):
             return NotImplemented
         newOp = copy.deepcopy(self)
         newOp.matrix = self.matrix - other.matrix
@@ -51,7 +52,8 @@ class operator:
     def __rmul__(self, scalar):
         return self.__mul__(scalar)
     
-class number(operator):
+class Number(Operator):
+    """Particle number operator n_i for site i."""
     def __init__(self,fock,index):
         super().__init__(fock)
         self.index = index
@@ -84,7 +86,7 @@ def _pair_matrix(fock, src, dst):
     ).tocsr()
 
 
-class correlator(operator):
+class Correlator(Operator):
     """c^dag_index2 c_index1: annihilate a particle at index1, create at index2."""
 
     def __init__(self, fock, index1, index2):
@@ -94,7 +96,7 @@ class correlator(operator):
         self.matrix = _pair_matrix(fock, index1, index2)
 
 
-class hopping(operator):
+class Hopping(Operator):
     """Sum of (c^dag_j c_i + h.c.) over the connection pairs (i, j)."""
 
     def __init__(self,fock,connections = 'pbc'):
@@ -121,20 +123,24 @@ class hopping(operator):
         self.matrix = T + T.T
 
 
-class interaction(operator):
-     def __init__(self,fock):
+class Interaction(Operator):
+    """On-site interaction operator sum_i n_i (n_i - 1)."""
+
+    def __init__(self, fock):
         super().__init__(fock)
-        self.matrix = sp.diags(np.sum(fock.fockArray*(fock.fockArray-1),axis=1), dtype=float)
+        self.matrix = sp.diags(np.sum(fock.fockArray * (fock.fockArray - 1), axis=1), dtype=float)
 
 
-class chemical_mu(operator):
-     def __init__(self,fock,mu):
+class ChemicalPotential(Operator):
+    """Chemical potential operator sum_i mu_i n_i."""
+
+    def __init__(self, fock, mu):
         super().__init__(fock)
-        self.matrix = sp.diags(np.sum(mu[None,:]*fock.fockArray,axis=1))
+        self.matrix = sp.diags(np.sum(mu[None, :] * fock.fockArray, axis=1))
 
 
 
-class correlator_m(operator):
+class correlator_m(Operator):
     """c^dag_index1 c_index2: annihilate a particle at index2, create at index1."""
 
     def __init__(self, fock, index1, index2):
@@ -142,3 +148,12 @@ class correlator_m(operator):
         self.index1 = index1
         self.index2 = index2
         self.matrix = _pair_matrix(fock, index2, index1)
+
+
+# Legacy aliases for existing notebooks/scripts; to be dropped in Phase 5.
+operator = Operator
+number = Number
+correlator = Correlator
+hopping = Hopping
+interaction = Interaction
+chemical_mu = ChemicalPotential

@@ -52,12 +52,6 @@ def test_hopping_rejects_malformed_connections(fock43):
         bohnasa.hopping(fock43, connections=[[0, 1, 2]])
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="bug: correlator_m(i,i) applies create-then-annihilate on the same "
-    "site reading the post-increment occupation, evaluating c c^dag = n+1 "
-    "instead of c^dag c = n; fixed by D's shared builder",
-)
 def test_correlator_m_diagonal_is_number(fock43):
     for i in range(3):
         assert np.allclose(

@@ -2,6 +2,7 @@ import numpy as np
 import scipy.sparse as sp 
 import copy
 import numbers
+import warnings
 
 class Operator:
     """A quantum operator represented as a sparse matrix in a FixedNFockSpace basis."""
@@ -51,6 +52,16 @@ class Operator:
 
     def __rmul__(self, scalar):
         return self.__mul__(scalar)
+
+    def adjoint(self):
+        """Hermitian conjugate as a new operator (matrix^dagger).
+
+        Note: metadata attributes (index1, index2, ...) still describe the
+        original operator.
+        """
+        newOp = copy.deepcopy(self)
+        newOp.matrix = self.matrix.T.conj().tocsr()
+        return newOp
     
 class Number(Operator):
     """Particle number operator n_i for site i."""
@@ -140,14 +151,14 @@ class ChemicalPotential(Operator):
 
 
 
-class correlator_m(Operator):
-    """c^dag_index1 c_index2: annihilate a particle at index2, create at index1."""
-
-    def __init__(self, fock, index1, index2):
-        super().__init__(fock)
-        self.index1 = index1
-        self.index2 = index2
-        self.matrix = _pair_matrix(fock, index2, index1)
+def correlator_m(fock, index1, index2):
+    """Deprecated shim: use Correlator(fock, index1, index2).adjoint()."""
+    warnings.warn(
+        "correlator_m is deprecated; use Correlator(fock, index1, index2).adjoint()",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+    return Correlator(fock, index1, index2).adjoint()
 
 
 # Legacy aliases for existing notebooks/scripts; to be dropped in Phase 5.

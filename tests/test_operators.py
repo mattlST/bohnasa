@@ -48,14 +48,22 @@ def test_correlator_is_annihilate_create(fock53):
         assert np.count_nonzero(M[:, index]) == 1
 
 
-def test_correlator_m_is_adjoint_of_correlator(fock53):
+def test_correlator_adjoint(fock53):
     i, j = 0, 1
-    c = bohnasa.correlator(fock53, i, j).matrix.toarray()
-    cm = bohnasa.correlator_m(fock53, i, j).matrix.toarray()
-    # correlator_m(i, j) = c_i^dag c_j = (c_j^dag c_i)^dag
-    assert np.allclose(cm, c.T.conj())
-    # and by convention correlator_m(i, j) == correlator(j, i)
-    assert np.allclose(cm, bohnasa.correlator(fock53, j, i).matrix.toarray())
+    c = bohnasa.Correlator(fock53, i, j)
+    cdag = c.adjoint()
+    assert np.allclose(cdag.matrix.toarray(), c.matrix.toarray().T.conj())
+    # and adjoint(c^dag_j c_i) == c^dag_i c_j == Correlator(j, i)
+    assert np.allclose(cdag.matrix.toarray(), bohnasa.Correlator(fock53, j, i).matrix.toarray())
+
+
+def test_correlator_m_shim_warns_and_matches_adjoint(fock53):
+    with pytest.warns(DeprecationWarning):
+        op = bohnasa.correlator_m(fock53, 0, 1)
+    assert np.allclose(
+        op.matrix.toarray(),
+        bohnasa.Correlator(fock53, 0, 1).adjoint().matrix.toarray(),
+    )
 
 
 @pytest.mark.parametrize("i,j,k,l", [(0, 1, 1, 2), (0, 1, 2, 0), (0, 2, 2, 0)])

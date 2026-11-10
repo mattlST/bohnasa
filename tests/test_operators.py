@@ -31,6 +31,13 @@ def test_chemical_mu_diagonal(fock53):
     assert np.allclose(op.matrix.diagonal(), fock53.fockArray @ mu)
 
 
+def test_chemical_potential_accepts_list_and_validates_shape(fock53):
+    op = bohnasa.ChemicalPotential(fock53, [1.0, 2.0, 3.0])
+    assert np.allclose(op.matrix.diagonal(), fock53.fockArray @ np.array([1.0, 2.0, 3.0]))
+    with pytest.raises(ValueError):
+        bohnasa.ChemicalPotential(fock53, [1.0, 2.0])
+
+
 def test_correlator_is_annihilate_create(fock53):
     # correlator(i, j) = c_j^dag c_i : moves one particle i -> j
     i, j = 0, 2

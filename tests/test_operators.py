@@ -125,6 +125,16 @@ def test_operator_addition(fock53):
     )
 
 
+def test_operator_subtraction(fock53):
+    a = bohnasa.number(fock53, 0)
+    b = bohnasa.number(fock53, 1)
+    c = a - b
+    assert np.allclose(
+        c.matrix.toarray(),
+        a.matrix.toarray() - b.matrix.toarray(),
+    )
+
+
 def test_scalar_multiplication(fock53):
     a = bohnasa.number(fock53, 0)
     c = a * 2.5

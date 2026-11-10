@@ -18,29 +18,21 @@ def fock43():
     return bohnasa.fockStates_fixed_particle_number(4, 3)
 
 
-@pytest.mark.xfail(
-    strict=True, reason="bug: FockSpace.__str__ returns print(...) -> TypeError"
-)
 def test_fock_space_str_returns_string(fock43):
     assert isinstance(str(fock43), str)
 
 
-@pytest.mark.xfail(strict=True, reason="bug: missing __rmul__ -> '2 * op' raises")
 def test_scalar_mult_reflected(fock43):
     op = bohnasa.number(fock43, 0)
     doubled = 2 * op
     assert np.allclose(doubled.matrix.toarray(), 2 * op.matrix.toarray())
 
 
-@pytest.mark.xfail(strict=True, reason="bug: __mul__ returns None for operator rhs")
 def test_operator_product_raises(fock43):
     with pytest.raises(TypeError):
         _ = bohnasa.number(fock43, 0) * bohnasa.number(fock43, 1)
 
 
-@pytest.mark.xfail(
-    strict=True, reason="bug: to_vector() returns implicit None when matrix unset"
-)
 def test_to_vector_raises_without_matrix(fock43):
     op = bohnasa.operator(fock43)
     with pytest.raises(ValueError):

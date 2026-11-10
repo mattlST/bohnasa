@@ -30,6 +30,6 @@ class fockStates_fixed_particle_number:
     def __call__(self):
         pass
     def __str__(self):
-        return print(f"particle number: {self.N} \n site number: {self.L}\n dimension: {self.dim} ")
+        return f"particle number: {self.N} \n site number: {self.L}\n dimension: {self.dim} "
 
 

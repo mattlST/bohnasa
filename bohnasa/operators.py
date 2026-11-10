@@ -3,6 +3,7 @@ import scipy.sparse.linalg as spl
 import scipy.sparse as sp 
 import typing
 import copy
+import numbers
 
 class operator:
     def __init__(self,fock):
@@ -24,18 +25,33 @@ class operator:
         return mean,var
     
     def to_vector(self):
-        if self.matrix is not None:
-            return np.asarray(self.matrix.todense()).reshape(-1)
-        
-    def __add__(self,A):
+        if self.matrix is None:
+            raise ValueError("operator has no matrix assigned yet")
+        return np.asarray(self.matrix.todense()).reshape(-1)
+
+    def __add__(self, other):
+        if not isinstance(other, operator):
+            return NotImplemented
         newOp = copy.deepcopy(self)
-        newOp.matrix += A.matrix
+        newOp.matrix = self.matrix + other.matrix
         return newOp
-    def __mul__(self,r):
-        if isinstance(r,(float,complex,int)):
-            newOp = copy.deepcopy(self)
-            newOp.matrix *= r
-            return newOp        
+
+    def __sub__(self, other):
+        if not isinstance(other, operator):
+            return NotImplemented
+        newOp = copy.deepcopy(self)
+        newOp.matrix = self.matrix - other.matrix
+        return newOp
+
+    def __mul__(self, scalar):
+        if not isinstance(scalar, numbers.Number):
+            return NotImplemented
+        newOp = copy.deepcopy(self)
+        newOp.matrix = self.matrix * scalar
+        return newOp
+
+    def __rmul__(self, scalar):
+        return self.__mul__(scalar)
     
 class number(operator):
     def __init__(self,fock,index):

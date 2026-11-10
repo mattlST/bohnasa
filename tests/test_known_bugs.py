@@ -52,11 +52,11 @@ def test_hopping_rejects_malformed_connections(fock43):
         bohnasa.hopping(fock43, connections=[[0, 1, 2]])
 
 
-def test_correlator_m_diagonal_is_number(fock43):
+def test_correlator_adjoint_diagonal_is_number(fock43):
     for i in range(3):
         assert np.allclose(
-            bohnasa.correlator_m(fock43, i, i).matrix.toarray(),
-            bohnasa.number(fock43, i).matrix.toarray(),
+            bohnasa.Correlator(fock43, i, i).adjoint().matrix.toarray(),
+            bohnasa.Number(fock43, i).matrix.toarray(),
         )
 
 

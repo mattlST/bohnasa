@@ -32,4 +32,4 @@ jobs:
     - name: Type check with mypy
       run: mypy bohnasa
     - name: Test with pytest
-      run: pytest --doctest-modules bohnasa/ tests/
+      run: pytest --doctest-modules bohnasa/ tests/ --cov=bohnasa --cov-report=term --cov-fail-under=90

@@ -11,11 +11,6 @@ import scipy.linalg as spla
 import bohnasa
 
 
-@pytest.fixture
-def fock43():
-    return bohnasa.fockStates_fixed_particle_number(4, 3)
-
-
 def test_fock_space_str_returns_string(fock43):
     assert isinstance(str(fock43), str)
 

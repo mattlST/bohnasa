@@ -210,9 +210,9 @@ class Hopping(Operator):
         L = self.L
 
         if connections == "pbc" or connections == "periodic":
-            indexPairs = np.array(list(zip(np.arange(L), np.roll(np.arange(L), 1))))
+            indexPairs = np.array(list(zip(np.arange(L), np.roll(np.arange(L), 1), strict=True)))
         elif connections == "obc" or connections == "open":
-            indexPairs = np.array(list(zip(np.arange(L - 1), np.arange(1, L))))
+            indexPairs = np.array(list(zip(np.arange(L - 1), np.arange(1, L), strict=True)))
         else:
             indexPairs = np.array(connections)
             if indexPairs.ndim != 2 or indexPairs.shape[1] != 2:
@@ -234,9 +234,7 @@ class Interaction(Operator):
 
     def __init__(self, fock):
         super().__init__(fock)
-        self.matrix = sp.diags(
-            np.sum(fock.fockArray * (fock.fockArray - 1), axis=1), dtype=float
-        )
+        self.matrix = sp.diags(np.sum(fock.fockArray * (fock.fockArray - 1), axis=1), dtype=float)
 
 
 class ChemicalPotential(Operator):
@@ -259,9 +257,7 @@ class ChemicalPotential(Operator):
         super().__init__(fock)
         mu = np.asarray(mu, dtype=float)
         if mu.shape != (self.L,):
-            raise ValueError(
-                f"mu must have shape ({self.L},) for {self.L} sites, got {mu.shape}"
-            )
+            raise ValueError(f"mu must have shape ({self.L},) for {self.L} sites, got {mu.shape}")
         self.matrix = sp.diags(np.sum(mu[None, :] * fock.fockArray, axis=1))
 
 

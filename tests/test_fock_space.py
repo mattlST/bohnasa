@@ -1,6 +1,7 @@
+from math import comb
+
 import numpy as np
 import pytest
-from math import comb
 
 import bohnasa
 

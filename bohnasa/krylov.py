@@ -60,7 +60,7 @@ def lanczos(sta, op, krylov_dim, beta_tol=1e-8):
     """
 
     norm = np.linalg.norm(sta)
-    # only zero/underflow/NaN are fatal: sta is rescaled below, so any other nonzero norm is a valid direction
+    # zero/underflow/NaN are fatal; other nonzero norms are valid (sta is rescaled)
     if norm == 0.0 or not np.isfinite(norm):
         raise ValueError("lanczos: start vector has zero or non-finite norm")
 
@@ -77,10 +77,8 @@ def lanczos(sta, op, krylov_dim, beta_tol=1e-8):
     T_m[0, 0] = alpha
 
     for j in range(1, krylov_dim + 1):
-
         beta = np.linalg.norm(w)
         if beta < beta_tol:
-
             # Happy breakdown: the Krylov space is exhausted.
             v_happy = v[0:j, :]
             T_m_happy = T_m[0:j, 0:j]
@@ -96,13 +94,15 @@ def lanczos(sta, op, krylov_dim, beta_tol=1e-8):
 
         for _ in range(MAX_REORTH_ITERATIONS):
             wn = w - v.T @ (v.conj() @ w)
-            # threshold scales with the vector norm: a fixed absolute tol sits below the machine-noise floor of large-norm operators
+            # norm-relative tol: fixed absolute tol is below the noise floor for large ||op||
             if np.linalg.norm(wn - w) < REORTH_REL_TOL * np.linalg.norm(wn) + REORTH_ABS_TOL:
                 w = wn
                 break
             logger.debug(
-                "Lanczos reorthogonalization step %d at Krylov index %d, "
-                "residual %g", _, j, np.linalg.norm(wn - w)
+                "Lanczos reorthogonalization step %d at Krylov index %d, residual %g",
+                _,
+                j,
+                np.linalg.norm(wn - w),
             )
             w = wn
         else:

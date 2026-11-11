@@ -1,6 +1,6 @@
-import numpy as np
-import pytest
 from math import factorial, sqrt
+
+import numpy as np
 
 import bohnasa
 

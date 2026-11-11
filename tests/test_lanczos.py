@@ -54,6 +54,43 @@ def test_lanczos_T_matrix_is_symmetric_tridiagonal():
     assert np.allclose(off, 0.0)
 
 
+def test_lanczos_rejects_zero_or_nonfinite_start():
+    fock = bohnasa.FixedNFockSpace(3, 3)
+    op = bohnasa.Hopping(fock)
+    with pytest.raises(ValueError):
+        bohnasa.lanczos(np.zeros(fock.dim, dtype=complex), op, 5)
+    bad = np.zeros(fock.dim, dtype=complex)
+    bad[0] = np.inf
+    with pytest.raises(ValueError):
+        bohnasa.lanczos(bad, op, 5)
+
+
+def test_lanczos_full_depth_staggered_coherent_reproduces_spectrum():
+    # t04_gram.ipynb converted: N=500, L=2, projected coherent state with
+    # staggered amplitudes phi = i*(-1)**j, generator H = -T + 4U, chain run
+    # to full depth. This large-energy-scale configuration exposed that an
+    # absolute reorthogonalization threshold cannot converge once
+    # ||op|| puts the machine-noise floor above it.
+    N, L = 500, 2
+    fock = bohnasa.FixedNFockSpace(N, L)
+    phi = 1j * np.array([(-1) ** j for j in range(L)], dtype=complex)
+    sta = bohnasa.fixed_n_coherent_state(fock, phi)
+    op = bohnasa.Hopping(fock) * -1.0 + bohnasa.Interaction(fock) * 4.0
+
+    v, T_m = bohnasa.lanczos(sta, op, fock.dim - 1, 1e-5)
+
+    gram = v @ v.conj().T
+    assert np.linalg.norm(gram - np.eye(v.shape[0])) < 1e-8
+
+    # at full Krylov depth the tridiagonal projection is isospectral to H
+    T = (T_m + T_m.T.conj()) / 2
+    assert np.allclose(
+        np.linalg.eigvalsh(T),
+        np.linalg.eigvalsh(op.matrix.toarray()),
+        atol=1e-6,
+    )
+
+
 def test_lanczos_ground_state_energy_matches_exact():
     N, L = 8, 4
     fock = bohnasa.fockStates_fixed_particle_number(N, L)

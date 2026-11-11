@@ -21,6 +21,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   exact-vs-Krylov ground states.
 - CI gates on `ruff check`, `ruff format --check`, `mypy`, pytest with coverage floor (90%)
   across Python 3.10-3.13.
+- Runnable `examples/` (basis, operators + ground state, Krylov complexity quench,
+  attractive disordered chain), `examples` extra (matplotlib), smoke-tested headless in CI.
 
 ### Changed
 - `hopping`, `correlator`, `correlator_m` share one transition-matrix builder with a
@@ -42,6 +44,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ### Removed
 - `setup.py`, `requirements.txt`, tracked `bohnasa.egg-info/`, flake8 from CI,
   dead code and unreachable statements throughout.
+- Development notebooks `t02`-`t05`: physics content converted to permanent tests
+  and runnable examples (originals recoverable from git history).
 
 ## [0.0.0] - 2024-09-13
 - Initial private development history: Fock-space enumeration, operators, coherent

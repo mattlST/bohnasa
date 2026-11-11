@@ -10,6 +10,8 @@ from . import operators
 logger = logging.getLogger(__name__)
 
 MAX_REORTH_ITERATIONS = 20
+REORTH_REL_TOL = 1e-10
+REORTH_ABS_TOL = 1e-12
 
 
 def lanczos(sta, op, krylov_dim, beta_tol=1e-8):
@@ -41,19 +43,30 @@ def lanczos(sta, op, krylov_dim, beta_tol=1e-8):
 
     Raises
     ------
+    ValueError
+        If ``sta`` has zero or non-finite norm.
     RuntimeError
         If iterative reorthogonalization fails to converge within
         ``MAX_REORTH_ITERATIONS`` passes.
 
     Notes
     -----
-    Eigenvalues of ``T_m`` approximate the extreme eigenvalues of ``op``
-    already for ``krylov_dim`` far below the full Hilbert-space dimension.
+    Reorthogonalization stops when a projection pass changes ``w`` by less
+    than ``REORTH_REL_TOL * ||w|| + REORTH_ABS_TOL`` (a purely absolute
+    threshold is unreachable once the operator norm makes the noise floor
+    larger than it). Eigenvalues of ``T_m`` approximate the extreme
+    eigenvalues of ``op`` already for ``krylov_dim`` far below the full
+    Hilbert-space dimension.
     """
+
+    norm = np.linalg.norm(sta)
+    # only zero/underflow/NaN are fatal: sta is rescaled below, so any other nonzero norm is a valid direction
+    if norm == 0.0 or not np.isfinite(norm):
+        raise ValueError("lanczos: start vector has zero or non-finite norm")
 
     v = np.zeros((krylov_dim + 1, sta.shape[0]), dtype=complex)
     T_m = np.zeros((krylov_dim + 1, krylov_dim + 1), dtype=complex)
-    v[0] = sta / np.linalg.norm(sta)
+    v[0] = sta / norm
 
     w_prime = op(v[0])
 
@@ -83,7 +96,8 @@ def lanczos(sta, op, krylov_dim, beta_tol=1e-8):
 
         for _ in range(MAX_REORTH_ITERATIONS):
             wn = w - v.T @ (v.conj() @ w)
-            if np.linalg.norm(wn - w) < 1e-12:
+            # threshold scales with the vector norm: a fixed absolute tol sits below the machine-noise floor of large-norm operators
+            if np.linalg.norm(wn - w) < REORTH_REL_TOL * np.linalg.norm(wn) + REORTH_ABS_TOL:
                 w = wn
                 break
             logger.debug(

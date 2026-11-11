@@ -12,9 +12,7 @@ def fock53():
 def test_number_diagonal_is_occupation(fock53):
     for i in range(3):
         n_i = bohnasa.number(fock53, i)
-        assert np.allclose(
-            n_i.matrix.diagonal(), fock53.fockArray[:, i]
-        )
+        assert np.allclose(n_i.matrix.diagonal(), fock53.fockArray[:, i])
         assert np.allclose(n_i.matrix.toarray(), n_i.matrix.toarray().T.conj())
 
 
@@ -73,14 +71,14 @@ def test_correlator_m_shim_warns_and_matches_adjoint(fock53):
     )
 
 
-@pytest.mark.parametrize("i,j,k,l", [(0, 1, 1, 2), (0, 1, 2, 0), (0, 2, 2, 0)])
-def test_bosonic_commutator_of_correlators(fock53, i, j, k, l):
+@pytest.mark.parametrize("i,j,k,ell", [(0, 1, 1, 2), (0, 1, 2, 0), (0, 2, 2, 0)])
+def test_bosonic_commutator_of_correlators(fock53, i, j, k, ell):
     # [c_j^dag c_i, c_l^dag c_k] = delta_il c_k^dag c_j - delta_jk c_i^dag c_l
     def A(p, q):
         return bohnasa.correlator(fock53, p, q).matrix.toarray()
 
-    lhs = A(i, j) @ A(k, l) - A(k, l) @ A(i, j)
-    rhs = (int(i == l)) * A(k, j) - (int(j == k)) * A(i, l)
+    lhs = A(i, j) @ A(k, ell) - A(k, ell) @ A(i, j)
+    rhs = (int(i == ell)) * A(k, j) - (int(j == k)) * A(i, ell)
     assert np.allclose(lhs, rhs)
 
 

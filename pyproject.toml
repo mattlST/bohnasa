@@ -28,9 +28,16 @@ packages = ["bohnasa"]
 [tool.ruff]
 target-version = "py310"
 line-length = 100
+# notebooks are converted to tests/examples in Phase 4; linting them meanwhile
+# fails on stale scratch cells (e.g. t03)
+extend-exclude = ["**/*.ipynb"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B"]
+
+[tool.ruff.lint.per-file-ignores]
+# the package API is deliberately re-exported via star imports
+"bohnasa/__init__.py" = ["F401", "F403"]
 
 [tool.mypy]
 python_version = "3.10"

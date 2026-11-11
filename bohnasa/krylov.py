@@ -141,6 +141,24 @@ def krylov_complexity(fock, op, sta, numVec):
     -------
     Operator
         Krylov complexity operator in the physical basis.
+
+    Notes
+    -----
+    State-based Krylov complexity: the chain {|v_n>} is built once from
+    ``sta`` under ``op``, and <psi(t)|K|psi(t)> measures how far the
+    *evolving state* spreads over the 0-based Krylov levels (K(0) = 0).
+    The chain is truncated at ``numVec`` levels, so <K> saturates once
+    |psi(t)> leaves the computed Krylov space. Operator-growth
+    K-complexity - chain built by the Liouvillian ``L = [H, .]`` from an
+    operator seed - is the sibling convention, reachable by supplying the
+    superoperator as ``op``.
+
+    References
+    ----------
+    .. [1] P. Caputa, J. M. Magan, D. Patramanis, "Geometry of Krylov
+       complexity", Phys. Rev. Research 4, 013041 (2022), arXiv:2109.03824.
+    .. [2] P. Nandy et al., "Quantum dynamics in Krylov space: methods and
+       applications", arXiv:2405.09628 (2024, review).
     """
     v, T_m = lanczos(sta, op, numVec)
 

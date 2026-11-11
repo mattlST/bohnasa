@@ -17,7 +17,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest", "ruff", "mypy"]
+dev = ["pytest", "pytest-cov", "ruff", "mypy", "scipy-stubs"]
 
 [project.urls]
 Homepage = "https://github.com/mattlST/bohnasa"
@@ -33,7 +33,7 @@ line-length = 100
 extend-exclude = ["**/*.ipynb"]
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "UP", "B"]
+select = ["E", "F", "I", "UP", "B", "T"]
 
 [tool.ruff.lint.per-file-ignores]
 # the package API is deliberately re-exported via star imports

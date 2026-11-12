@@ -2,7 +2,6 @@
 
 import copy
 import numbers
-import warnings
 
 import numpy as np
 import scipy.sparse as sp
@@ -259,22 +258,3 @@ class ChemicalPotential(Operator):
         if mu.shape != (self.L,):
             raise ValueError(f"mu must have shape ({self.L},) for {self.L} sites, got {mu.shape}")
         self.matrix = sp.diags(np.sum(mu[None, :] * fock.fockArray, axis=1))
-
-
-def correlator_m(fock, index1, index2):
-    """Deprecated shim: use ``Correlator(fock, index1, index2).adjoint()``."""
-    warnings.warn(
-        "correlator_m is deprecated; use Correlator(fock, index1, index2).adjoint()",
-        DeprecationWarning,
-        stacklevel=2,
-    )
-    return Correlator(fock, index1, index2).adjoint()
-
-
-# Legacy aliases for existing notebooks/scripts; to be dropped in Phase 5.
-operator = Operator
-number = Number
-correlator = Correlator
-hopping = Hopping
-interaction = Interaction
-chemical_mu = ChemicalPotential

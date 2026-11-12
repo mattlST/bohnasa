@@ -11,9 +11,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   reflection-parity blocks for periodic chains, mirror-parity blocks for open
   ones; `restrict`/`to_sector` feed Lanczos and Krylov runs in sector space
   (issue #13).
-- Runnable examples `ex05_symmetry_sectors.py` and `ex06_momentum_spectra.py`
+- Operator-growth Krylov complexity: `Liouvillian` (commutator superoperator
+  acting on flattened operators, never assembled as a matrix) and
+  `operator_growth` (chain + <K̂>(t) of the Heisenberg-evolved operator), the
+  sibling convention of `krylov_complexity` (issue #15).
+- Runnable examples `ex05_symmetry_sectors.py`, `ex06_momentum_spectra.py` and
+  `ex07_operator_growth.py`
   (block reassembly, sector structure of a coherent quench, Krylov chain
-  computed inside one sector, per-sector spectra vs analytic free bosons).
+  computed inside one sector, per-sector spectra vs analytic free bosons,
+  operator growth).
 - Security policy (`SECURITY.md`, private vulnerability reporting) and issue
   templates (bug report, feature request).
 - Coding rules (`CODING_RULES.md`), contribution process (`CONTRIBUTING.md`), changelog.

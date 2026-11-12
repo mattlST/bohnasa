@@ -165,3 +165,142 @@ def krylov_complexity(fock, op, sta, numVec):
     krylov_op = operators.Operator(fock)
     krylov_op.matrix = sp.csr_matrix(v.conj().T @ np.diag(np.arange(v.shape[0])) @ v)
     return krylov_op
+
+
+class Liouvillian:
+    """Liouvillian superoperator ``L̂ = [H, ·]`` acting in Liouville space.
+
+    Operators are represented as row-major flattened vectors ``vec(X) =
+    X.reshape(-1)``, the Hilbert-Schmidt inner product ``(A|B) = tr(A†B)`` is
+    the plain vector dot product, and the action is the commutator,
+    ``vec([H, X]) = (kron(H, I) - kron(I, H.T)) @ vec(X)``. The commutator is
+    applied directly - the ``dim² × dim²`` superoperator is never assembled.
+    For Hermitian ``H`` the superoperator is Hermitian, so ``lanczos`` applies
+    to it, and the identity is its zero-eigenvalue direction.
+
+    Parameters
+    ----------
+    hamiltonian : Operator
+        Time-independent Hamiltonian with a matrix representation.
+
+    Attributes
+    ----------
+    dim : int
+        Operator-space side length; Liouville space has dimension ``dim**2``.
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> from bohnasa import FixedNFockSpace, Hopping
+    >>> H = Hopping(FixedNFockSpace(1, 3), connections="pbc")
+    >>> L = Liouvillian(H)
+    >>> np.allclose(L(np.eye(3, dtype=complex).reshape(-1)), 0)
+    True
+    """
+
+    def __init__(self, hamiltonian: "operators.Operator") -> None:
+        if hamiltonian.matrix is None:
+            raise ValueError("Liouvillian: hamiltonian has no matrix representation")
+        self._ham = hamiltonian.matrix
+        self.dim = int(hamiltonian.matrix.shape[0])
+
+    def vectorize(self, operator: "operators.Operator") -> np.ndarray:
+        """Flatten an operator to a Liouville-space vector (row-major)."""
+        if operator.matrix is None:
+            raise ValueError("vectorize: operator has no matrix representation")
+        if operator.matrix.shape != (self.dim, self.dim):
+            raise ValueError(
+                f"vectorize: operator shape {operator.matrix.shape} does not match "
+                f"Liouville space dim {self.dim}**2"
+            )
+        return np.asarray(operator.matrix.toarray(), dtype=complex).reshape(-1)
+
+    def unvectorize(self, vector: np.ndarray) -> np.ndarray:
+        """Reshape a Liouville-space vector back into a ``dim x dim`` matrix."""
+        return np.asarray(vector, dtype=complex).reshape(self.dim, self.dim)
+
+    def __call__(self, vector: np.ndarray) -> np.ndarray:
+        """Apply ``[H, ·]`` to a flattened operator."""
+        x = np.asarray(vector, dtype=complex)
+        if x.size != self.dim**2:
+            raise ValueError(f"Liouvillian: expected length {self.dim**2} vector, got {x.size}")
+        x = x.reshape(self.dim, self.dim)
+        return np.asarray(self._ham @ x - x @ self._ham).reshape(-1)
+
+
+def operator_growth(liouvillian: Liouvillian, seed: "operators.Operator", times, numVec):
+    """Krylov complexity of an operator evolving under ``L̂ = [H, ·]``.
+
+    Builds the operator-growth Krylov chain ``|O_n)`` by Lanczos recursion of
+    the Liouvillian from the ``seed`` operator and returns the mean Krylov
+    level ``<K̂>(t) = sum_n n |phi_n(t)|^2`` of the Heisenberg-evolved operator
+    ``|O(t)) = exp(i L̂ t) |O_0)`` at the requested times, together with the
+    tridiagonal chain projection.
+
+    Parameters
+    ----------
+    liouvillian : Liouvillian
+        Superoperator generating the growth, usually ``Liouvillian(H)``.
+    seed : Operator
+        Initial operator (e.g. a local density ``Number``). Its trace is
+        subtracted: the identity is a zero-eigenvalue direction of ``L̂`` and
+        would otherwise sit at Krylov level 0 forever and dilute <K̂>.
+    times : numpy.ndarray
+        Times at which to evaluate <K̂>(t).
+    numVec : int
+        Number of Krylov vectors requested (chain truncation).
+
+    Returns
+    -------
+    krylov : numpy.ndarray of float, shape (len(times),)
+        The growth curve ``<K̂>(t)``.
+    T_m : numpy.ndarray of complex
+        Tridiagonal Liouvillian projection from ``lanczos`` (rows after a
+        happy breakdown only).
+
+    Raises
+    ------
+    ValueError
+        If the seed has no matrix representation, does not match the
+        Liouvillian's dimension, or is proportional to the identity (zero
+        growth after trace subtraction).
+
+    Notes
+    -----
+    Operator-growth convention - the sibling of the state-based
+    :func:`krylov_complexity`: the chain lives in Liouville space (dim**2
+    dimensional) and measures how the *operator* spreads, not the state. A
+    chain of ``numVec`` vectors caps the measurable growth at ``numVec - 1``;
+    for operators with weight on high Krylov levels the curve saturates at the
+    truncation wall, not at the true asymptote.
+
+    References
+    ----------
+    .. [1] P. Caputa, J. M. Magan, D. Patramanis, "Geometry of Krylov
+       complexity", Phys. Rev. Research 4, 013041 (2022), arXiv:2109.03824.
+    .. [2] P. Nandy et al., "Quantum dynamics in Krylov space: methods and
+       applications", arXiv:2405.09628 (2024, review).
+    """
+    if seed.matrix is None:
+        raise ValueError("operator_growth: seed operator has no matrix representation")
+    if seed.matrix.shape != (liouvillian.dim, liouvillian.dim):
+        raise ValueError(
+            f"operator_growth: seed shape {seed.matrix.shape} does not match "
+            f"Liouvillian dim {liouvillian.dim}"
+        )
+    dim = liouvillian.dim
+    traceless = seed.matrix.toarray().astype(complex)
+    traceless -= np.trace(traceless) / dim * np.eye(dim)
+    norm = np.linalg.norm(traceless)
+    if norm == 0.0:
+        raise ValueError("operator_growth: seed is proportional to the identity")
+
+    v, T_m = lanczos(traceless.reshape(-1) / norm, liouvillian, numVec)
+    k_op = np.arange(v.shape[0], dtype=float)
+    eigval, eigvec = np.linalg.eigh(T_m)
+    seed_coeffs = eigvec[0, :].conj()  # (v_n|O_0) = delta_n0, and V^dagger e_0
+    krylov = np.empty(len(times), dtype=float)
+    for i, t in enumerate(times):
+        coeffs = eigvec @ (np.exp(1j * eigval * t) * seed_coeffs)
+        krylov[i] = np.dot(k_op, np.abs(coeffs) ** 2)
+    return krylov, T_m

@@ -11,8 +11,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   reflection-parity blocks for periodic chains, mirror-parity blocks for open
   ones; `restrict`/`to_sector` feed Lanczos and Krylov runs in sector space
   (issue #13).
-- Runnable example `ex05_symmetry_sectors.py` (block reassembly, sector
-  structure of a coherent quench, Krylov chain computed inside one sector).
+- Runnable examples `ex05_symmetry_sectors.py` and `ex06_momentum_spectra.py`
+  (block reassembly, sector structure of a coherent quench, Krylov chain
+  computed inside one sector, per-sector spectra vs analytic free bosons).
 - Security policy (`SECURITY.md`, private vulnerability reporting) and issue
   templates (bug report, feature request).
 - Coding rules (`CODING_RULES.md`), contribution process (`CONTRIBUTING.md`), changelog.

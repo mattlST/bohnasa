@@ -12,6 +12,10 @@ growth and Krylov complexity after a quench.
   occupation-pattern index lookup
 - second-quantized operators on sparse matrices: `Number`, `Correlator`
   (`c_j† c_i`), `Hopping`, `Interaction`, `ChemicalPotential`
+- `Hamiltonian` — generic normal-ordered 1-/2-body builder
+  (`Σ t_ij c†_i c_j + Σ V_ijkl c†_i c†_j c_k c_l`) from coefficient arrays:
+  inhomogeneous or non-reciprocal hopping, site-dependent on-site terms,
+  full two-body tensors
 - `lanczos` — Lanczos recursion with full reorthogonalization
 - `krylov_complexity` — the Krylov-level operator, time-evolvable after a
   quench from a projected coherent state (`fixed_n_coherent_state`,
@@ -43,6 +47,12 @@ import bohnasa
 
 fock = bohnasa.FixedNFockSpace(N=6, L=4)
 H = bohnasa.Hopping(fock, connections="obc") * -1.0 + bohnasa.Interaction(fock) * 0.5
+# same Hamiltonian from the generic builder:
+chain = np.eye(fock.L, k=1) + np.eye(fock.L, k=-1)
+assert np.allclose(
+    bohnasa.Hamiltonian(fock, one_body=-chain, onsite_u=0.5).matrix.toarray(),
+    H.matrix.toarray(),
+)
 
 v, T = bohnasa.lanczos(np.ones(fock.dim, dtype=complex) / np.sqrt(fock.dim), H, 40)
 m = np.count_nonzero(np.linalg.norm(v, axis=1) > 1e-12)

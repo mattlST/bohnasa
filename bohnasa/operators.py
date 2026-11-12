@@ -258,3 +258,128 @@ class ChemicalPotential(Operator):
         if mu.shape != (self.L,):
             raise ValueError(f"mu must have shape ({self.L},) for {self.L} sites, got {mu.shape}")
         self.matrix = sp.diags(np.sum(mu[None, :] * fock.fockArray, axis=1))
+
+
+def _quartic_matrix(fock, i, j, k, ell):
+    """Sparse matrix of the normal-ordered monomial ``c^dag_i c^dag_j c_k c_l``.
+
+    The rightmost operator acts first: annihilate at ``l``, then ``k``, then
+    create at ``j``, then ``i`` - occupation bookkeeping is exact for
+    coinciding indices (``k == l`` needs ``n_l >= 2`` etc. automatically).
+    """
+    rows = []
+    cols = []
+    vals = []
+    for col, x in enumerate(fock.fockSpace):
+        occ = list(x)
+        amp = 1.0
+        for site in (ell, k):
+            if occ[site] == 0:
+                amp = 0.0
+                break
+            amp *= np.sqrt(occ[site])
+            occ[site] -= 1
+        if amp == 0.0:
+            continue
+        for site in (j, i):
+            amp *= np.sqrt(occ[site] + 1)
+            occ[site] += 1
+        rows.append(fock.dict[tuple(occ)])
+        cols.append(col)
+        vals.append(amp)
+    if not rows:
+        return sp.csr_matrix((fock.dim, fock.dim), dtype=float)
+    return sp.coo_matrix(
+        (np.array(vals), (np.array(rows), np.array(cols))),
+        shape=(fock.dim, fock.dim),
+    ).tocsr()
+
+
+class Hamiltonian(Operator):
+    r"""Generic normal-ordered one- and two-body bosonic Hamiltonian.
+
+    Assembles ``H = sum_ij t_ij c^dag_i c_j + sum_ijkl V_ijkl c^dag_i c^dag_j
+    c_k c_l`` from coefficient arrays on a ``FixedNFockSpace`` basis.
+    Coefficients are taken literally: no Hermiticity or index symmetry is
+    imposed or assumed (a Hermitian ``H`` needs Hermitian input, e.g. the
+    full set of symmetry-related ``V`` entries). Only nonzero entries are
+    materialized, so dense-but-sparse-valued inputs stay cheap.
+
+    Parameters
+    ----------
+    fock : FixedNFockSpace
+        Basis of the system.
+    one_body : array-like of shape (L, L), optional
+        ``t_ij`` = coefficient of ``c^dag_i c_j`` (rightmost operator acts
+        first). A diagonal entry ``t_ii`` is a chemical potential ``mu_i n_i``;
+        ``-t`` on a symmetric bond adjacency reproduces ``-t`` times
+        ``Hopping``.
+    two_body : array-like of shape (L, L, L, L), optional
+        ``V_ijkl`` = coefficient of ``c^dag_i c^dag_j c_k c_l``. Mutually
+        exclusive with ``onsite_u``.
+    onsite_u : float or array-like of shape (L,), optional
+        Convenience for the on-site term ``sum_i u_i n_i (n_i - 1)``, i.e.
+        ``V_iiii = u_i``. Mutually exclusive with ``two_body``.
+
+    Raises
+    ------
+    ValueError
+        If a coefficient array has the wrong shape, or ``two_body`` and
+        ``onsite_u`` are both given.
+
+    Notes
+    -----
+    With all inputs omitted the result is the zero operator. The term
+    convention carries no 1/2 factors: the Bose-Hubbard model
+    ``-t sum (c^dag_j c_i + h.c.) + U/2 sum n_i (n_i - 1)`` is
+    ``Hamiltonian(fock, one_body=-t * adjacency, onsite_u=U / 2)``.
+
+    Examples
+    --------
+    >>> from bohnasa import FixedNFockSpace, Hopping, Interaction
+    >>> fock = FixedNFockSpace(2, 3)
+    >>> adjacency = np.ones((3, 3)) - np.eye(3)  # ring graph for L = 3
+    >>> H = Hamiltonian(fock, one_body=-adjacency, onsite_u=0.5)
+    >>> Href = Hopping(fock, connections="pbc") * (-1.0) + Interaction(fock) * 0.5
+    >>> np.allclose(H.matrix.toarray(), Href.matrix.toarray())
+    True
+    """
+
+    def __init__(self, fock, one_body=None, two_body=None, onsite_u=None):
+        super().__init__(fock)
+        L = self.L
+        if two_body is not None and onsite_u is not None:
+            raise ValueError("Hamiltonian: give two_body or onsite_u, not both")
+
+        matrix = sp.csr_matrix((self.dim, self.dim), dtype=float)
+
+        if one_body is not None:
+            t = np.asarray(one_body)
+            if t.shape != (L, L):
+                raise ValueError(f"Hamiltonian: one_body must have shape ({L}, {L}), got {t.shape}")
+            for i, j in zip(*np.nonzero(t), strict=False):
+                matrix = matrix + t[i, j] * _pair_matrix(fock, int(j), int(i))
+
+        if onsite_u is not None:
+            u = np.atleast_1d(np.asarray(onsite_u, dtype=float))
+            if u.size == 1:
+                u = np.full(L, float(u[0]))
+            if u.shape != (L,):
+                raise ValueError(
+                    f"Hamiltonian: onsite_u must be a scalar or shape ({L},), got {u.shape}"
+                )
+            occ = fock.fockArray
+            matrix = matrix + sp.diags(np.sum(u[None, :] * occ * (occ - 1), axis=1))
+
+        if two_body is not None:
+            V = np.asarray(two_body)
+            if V.shape != (L, L, L, L):
+                raise ValueError(
+                    f"Hamiltonian: two_body must have shape ({L}, {L}, {L}, {L}), got {V.shape}"
+                )
+            for i, j, k, ell in zip(*np.nonzero(V), strict=False):
+                matrix = matrix + V[i, j, k, ell] * _quartic_matrix(
+                    fock, int(i), int(j), int(k), int(ell)
+                )
+
+        self.matrix = matrix

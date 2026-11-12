@@ -16,6 +16,9 @@ growth and Krylov complexity after a quench.
 - `krylov_complexity` — the Krylov-level operator, time-evolvable after a
   quench from a projected coherent state (`fixed_n_coherent_state`,
   `time_evolution_exact_ind`)
+- `SymmetrySectors` — crystal-momentum/parity block decomposition of the
+  fixed-N space; diagonalization, Lanczos and Krylov chains cost roughly
+  `1/L` per block once the state lives in a single sector
 - runnable [examples](examples/README.md) covering all of the above
 
 ## Install

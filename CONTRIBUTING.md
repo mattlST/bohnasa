@@ -36,17 +36,21 @@ Rules of the road:
 
 ## Definition of done (every PR)
 
-- `pytest tests/` green, **no new warnings** in the output.
-- Every new feature ships with tests; every fixed bug ships with a regression test.
-- Known-bug markers (`xfail(strict=True)` in `tests/test_known_bugs.py`) are removed
-  in the PR that fixes them — a stale marker is a CI failure by design.
+- The local gate stack is green — CI runs exactly this, on every push:
+
+      ruff check . && ruff format --check . && mypy bohnasa
+      pytest --doctest-modules bohnasa/ tests/ -q --cov=bohnasa --cov-fail-under=90
+
+- Every new feature ships with tests; every fixed bug ships with a regression
+  test in `tests/regression/` — permanent guards, not markers to chase.
 - The change satisfies CODING_RULES.md; if it deliberately breaks a rule, say why in
   the PR body (rule changes are discussed as openly as code).
 
 ## CI gates
 
-Current: pytest + flake8-critical on Python 3.10 and 3.11.
-Planned: ruff (format + lint) and mypy (public API signatures) as blocking checks.
+Blocking on Python 3.10–3.13: `ruff` lint + format, `mypy` on the public API,
+pytest with doctests and a 90% coverage floor, and a headless smoke run of
+every script in `examples/`.
 
 ## Larger ideas first
 

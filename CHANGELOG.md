@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- Generic one-/two-body Hamiltonian builder (`Hamiltonian`): normal-ordered
+  `Σ t_ij c†_i c_j + Σ V_ijkl c†_i c†_j c_k c_l` from coefficient arrays
+  (`one_body`, `two_body`/`onsite_u`), literal coefficients, only nonzero
+  entries materialized; reproduces the hand-assembled
+  `Hopping * (-1) + Interaction * U` sandwiches exactly (issue #17).
 - Symmetry sectors (`SymmetrySectors`, `SectorLabel`): crystal-momentum +
   reflection-parity blocks for periodic chains, mirror-parity blocks for open
   ones; `restrict`/`to_sector` feed Lanczos and Krylov runs in sector space

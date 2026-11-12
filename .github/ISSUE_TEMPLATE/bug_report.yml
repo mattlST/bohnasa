@@ -1,0 +1,34 @@
+name: Bug report
+description: Something computes wrong, crashes, or behaves unexpectedly
+labels: ["bug"]
+body:
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: Expected vs. actual behaviour. Numbers and matrix elements welcome — this is physics code, precision matters.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Minimal reproduction
+      description: Shortest script that shows it. Include system size (N, L) so the Hilbert-space dimension is clear.
+      render: python
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: bohnasa version or commit
+      placeholder: "0.1.0 / master@abc1234"
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      description: Python version, OS, numpy/scipy versions
+      placeholder: "Python 3.12, Linux, numpy 2.1, scipy 1.14"
+    validations:
+      required: true

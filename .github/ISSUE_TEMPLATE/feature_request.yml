@@ -1,0 +1,26 @@
+name: Feature request
+description: New physics capability or API change
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: The physics need
+      description: What do you want to compute that you currently cannot?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed shape
+      description: Sketch of the API or algorithm, if you have one. Rough is fine.
+      render: python
+    validations:
+      required: false
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Workaround today
+      description: How would you hack this together with the current API? (Good candidates for examples/)
+    validations:
+      required: false

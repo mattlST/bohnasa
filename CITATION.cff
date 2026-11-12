@@ -1,0 +1,45 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+authors:
+  - name: "Mathias Steinhuber"
+title: "bohnasa: exact diagonalization for bosonic quantum many-body systems"
+description: >-
+  Exact-diagonalization tools for bosonic quantum many-body systems in the
+  fixed particle-number Fock sector, including Lanczos recursion and Krylov
+  complexity after a quench.
+repository-code: "https://github.com/mattlST/bohnasa"
+license: MIT
+copyright-holder: "Mathias Steinhuber"
+copyright-year: "2024"
+version: "0.1.0"
+date-released: "2026-11-12"
+references:
+  - type: article
+    title: "Geometry of Krylov complexity"
+    authors:
+      - name: "Pratik Caputa"
+      - name: "Juan M. Magan"
+      - name: "Dimitrios Patramanis"
+    year: 2022
+    journal: "Physical Review Research"
+    volume: "4"
+    issue: "1"
+    start-code: "013041"
+    doi: "10.1103/PhysRevResearch.4.013041"
+    eprint: "2109.03824"
+    eprinttype: "arxiv"
+  - type: article
+    title: "Quantum Dynamics in Krylov Space: Methods and Applications"
+    authors:
+      - name: "Pratik Nandy"
+      - name: "Apollonas S. Matsoukas-Roubeas"
+      - name: "Pablo Martínez-Azcona"
+      - name: "Anatoly Dymarsky"
+      - name: "Adolfo del Campo"
+    year: 2025
+    journal: "Physics Reports"
+    volume: "1125"
+    start-code: "1"
+    doi: "10.1016/j.physrep.2025.05.001"
+    eprint: "2405.09628"
+    eprinttype: "arxiv"

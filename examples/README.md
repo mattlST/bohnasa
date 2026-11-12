@@ -11,6 +11,7 @@ question, ends with self-check assertions, and is smoke-tested headless in CI
 | `ex03_krylov_complexity.py` | Krylov spread ⟨K̂⟩(t) after a staggered coherent quench |
 | `ex04_transmon_boson.py` | attractive bosons with disorder: eigenstate participation (IPR) in Fock space |
 | `ex05_symmetry_sectors.py` | momentum/parity blocks: spectrum reassembly and a Krylov quench computed inside one sector |
+| `ex06_momentum_spectra.py` | per-sector eigenvalues vs the analytic free-boson solution, and interacting ladders with the k/−k degeneracy |
 
 Run:
 

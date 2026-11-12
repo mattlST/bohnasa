@@ -165,7 +165,3 @@ def krylov_complexity(fock, op, sta, numVec):
     krylov_op = operators.Operator(fock)
     krylov_op.matrix = sp.csr_matrix(v.conj().T @ np.diag(np.arange(v.shape[0])) @ v)
     return krylov_op
-
-
-# Legacy alias for existing notebooks/scripts; to be dropped in Phase 5.
-Krylov_complexity = krylov_complexity

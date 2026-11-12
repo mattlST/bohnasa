@@ -6,9 +6,9 @@ import bohnasa
 
 def test_happy_breakdown_on_eigenstate():
     N, L = 5, 3
-    fock = bohnasa.fockStates_fixed_particle_number(N, L)
+    fock = bohnasa.FixedNFockSpace(N, L)
     sta = bohnasa.single_fockstate(fock, np.array([3, 1, 1]))
-    op = bohnasa.number(fock, 0)
+    op = bohnasa.Number(fock, 0)
     v, T_m = bohnasa.lanczos(sta, op, 10)
     assert v.shape == (1, fock.dim)
     assert T_m.shape == (1, 1)
@@ -17,8 +17,8 @@ def test_happy_breakdown_on_eigenstate():
 
 def test_lanczos_vectors_stay_orthonormal():
     N, L = 8, 4
-    fock = bohnasa.fockStates_fixed_particle_number(N, L)
-    op = bohnasa.hopping(fock) + bohnasa.interaction(fock) * 0.3
+    fock = bohnasa.FixedNFockSpace(N, L)
+    op = bohnasa.Hopping(fock) + bohnasa.Interaction(fock) * 0.3
     rng = np.random.default_rng(1)
     sta = rng.normal(size=fock.dim) + 1j * rng.normal(size=fock.dim)
     sta /= np.linalg.norm(sta)
@@ -35,8 +35,8 @@ def test_lanczos_vectors_stay_orthonormal():
 
 def test_lanczos_T_matrix_is_symmetric_tridiagonal():
     N, L = 8, 4
-    fock = bohnasa.fockStates_fixed_particle_number(N, L)
-    op = bohnasa.hopping(fock) + bohnasa.interaction(fock) * 0.3
+    fock = bohnasa.FixedNFockSpace(N, L)
+    op = bohnasa.Hopping(fock) + bohnasa.Interaction(fock) * 0.3
     rng = np.random.default_rng(2)
     sta = rng.normal(size=fock.dim) + 1j * rng.normal(size=fock.dim)
     sta /= np.linalg.norm(sta)
@@ -93,8 +93,8 @@ def test_lanczos_full_depth_staggered_coherent_reproduces_spectrum():
 
 def test_lanczos_ground_state_energy_matches_exact():
     N, L = 8, 4
-    fock = bohnasa.fockStates_fixed_particle_number(N, L)
-    op = bohnasa.hopping(fock) + bohnasa.interaction(fock) * 0.3
+    fock = bohnasa.FixedNFockSpace(N, L)
+    op = bohnasa.Hopping(fock) + bohnasa.Interaction(fock) * 0.3
     rng = np.random.default_rng(4)
     sta = rng.normal(size=fock.dim) + 1j * rng.normal(size=fock.dim)
     sta /= np.linalg.norm(sta)

@@ -68,7 +68,3 @@ class FixedNFockSpace:
 
     def __str__(self):
         return f"particle number: {self.N} \n site number: {self.L}\n dimension: {self.dim} "
-
-
-# Legacy alias for existing notebooks/scripts; to be dropped in Phase 5.
-fockStates_fixed_particle_number = FixedNFockSpace

@@ -7,7 +7,7 @@ import bohnasa
 
 def test_single_fockstate_has_one_at_correct_index():
     N, L = 5, 3
-    fock = bohnasa.fockStates_fixed_particle_number(N, L)
+    fock = bohnasa.FixedNFockSpace(N, L)
     vec = np.array([2, 0, 3])
     psi = bohnasa.single_fockstate(fock, vec)
     assert psi.shape == (fock.dim,)
@@ -27,10 +27,10 @@ def test_multinomial_known_values():
 def test_coherent_state_matches_analytic_formula():
     rng = np.random.default_rng(42)
     N, L = 4, 3
-    fock = bohnasa.fockStates_fixed_particle_number(N, L)
+    fock = bohnasa.FixedNFockSpace(N, L)
     phi = rng.normal(size=L) + 1j * rng.normal(size=L)
 
-    psi = bohnasa.coherent_state_number_projected(fock, phi.copy())
+    psi = bohnasa.fixed_n_coherent_state(fock, phi.copy())
     phi_n = phi / np.linalg.norm(phi)
 
     # <n|psi> = sqrt(N! / prod n_i!) * prod_i phi_i^{n_i}
@@ -49,10 +49,10 @@ def test_coherent_state_is_normalized_for_unit_phi():
     # total weight 1 (multinomial distribution)
     rng = np.random.default_rng(7)
     N, L = 6, 3
-    fock = bohnasa.fockStates_fixed_particle_number(N, L)
+    fock = bohnasa.FixedNFockSpace(N, L)
     phi = rng.normal(size=L) + 1j * rng.normal(size=L)
     phi /= np.linalg.norm(phi)
-    psi = bohnasa.coherent_state_number_projected(fock, phi)
+    psi = bohnasa.fixed_n_coherent_state(fock, phi)
     assert np.isclose(np.linalg.norm(psi), 1.0)
 
 
@@ -60,9 +60,9 @@ def test_coherent_state_global_phase_covariance():
     # phi -> phi * e^{i th}  =>  psi -> psi * e^{i th N}
     rng = np.random.default_rng(11)
     N, L = 4, 3
-    fock = bohnasa.fockStates_fixed_particle_number(N, L)
+    fock = bohnasa.FixedNFockSpace(N, L)
     phi = rng.normal(size=L) + 1j * rng.normal(size=L)
     theta = 0.7
-    psi1 = bohnasa.coherent_state_number_projected(fock, phi.copy())
-    psi2 = bohnasa.coherent_state_number_projected(fock, phi * np.exp(1j * theta))
+    psi1 = bohnasa.fixed_n_coherent_state(fock, phi.copy())
+    psi2 = bohnasa.fixed_n_coherent_state(fock, phi * np.exp(1j * theta))
     assert np.allclose(psi2, psi1 * np.exp(1j * theta * N))

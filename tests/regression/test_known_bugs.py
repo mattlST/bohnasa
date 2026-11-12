@@ -16,18 +16,18 @@ def test_fock_space_str_returns_string(fock43):
 
 
 def test_scalar_mult_reflected(fock43):
-    op = bohnasa.number(fock43, 0)
+    op = bohnasa.Number(fock43, 0)
     doubled = 2 * op
     assert np.allclose(doubled.matrix.toarray(), 2 * op.matrix.toarray())
 
 
 def test_operator_product_raises(fock43):
     with pytest.raises(TypeError):
-        _ = bohnasa.number(fock43, 0) * bohnasa.number(fock43, 1)
+        _ = bohnasa.Number(fock43, 0) * bohnasa.Number(fock43, 1)
 
 
 def test_to_vector_raises_without_matrix(fock43):
-    op = bohnasa.operator(fock43)
+    op = bohnasa.Operator(fock43)
     with pytest.raises(ValueError):
         op.to_vector()
 
@@ -39,12 +39,12 @@ def test_single_fockstate_rejects_wrong_particle_number(fock43):
 
 def test_coherent_state_rejects_wrong_phi_length(fock43):
     with pytest.raises(ValueError):
-        bohnasa.coherent_state_number_projected(fock43, np.array([1.0, 2.0]))
+        bohnasa.fixed_n_coherent_state(fock43, np.array([1.0, 2.0]))
 
 
 def test_hopping_rejects_malformed_connections(fock43):
     with pytest.raises(ValueError):
-        bohnasa.hopping(fock43, connections=[[0, 1, 2]])
+        bohnasa.Hopping(fock43, connections=[[0, 1, 2]])
 
 
 def test_correlator_adjoint_diagonal_is_number(fock43):
@@ -60,8 +60,8 @@ def test_time_evolution_preserves_complex_means(fock43):
     psi = rng.normal(size=fock43.dim) + 1j * rng.normal(size=fock43.dim)
     psi /= np.linalg.norm(psi)
 
-    H = bohnasa.number(fock43, 0)
-    obs = bohnasa.correlator(fock43, 0, 1)  # non-hermitian -> complex expectation
+    H = bohnasa.Number(fock43, 0)
+    obs = bohnasa.Correlator(fock43, 0, 1)  # non-hermitian -> complex expectation
     time = np.linspace(0.0, 1.0, 5)
 
     res = bohnasa.time_evolution_exact_ind(H, psi, time, [obs])

@@ -42,6 +42,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - Debug prints removed from `lanczos` and `time_evolution_exact_ind`.
 
 ### Removed
+- **Breaking (API freeze for 0.1.0):** legacy lowercase aliases
+  (`fockStates_fixed_particle_number`, `operator`, `number`, `correlator`, `hopping`,
+  `interaction`, `chemical_mu`, `coherent_state_number_projected`, `Krylov_complexity`),
+  the deprecated `correlator_m` shim, and the `bohnasa.util` module.
 - `setup.py`, `requirements.txt`, tracked `bohnasa.egg-info/`, flake8 from CI,
   dead code and unreachable statements throughout.
 - Development notebooks `t02`-`t05`: physics content converted to permanent tests

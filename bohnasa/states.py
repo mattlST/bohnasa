@@ -104,7 +104,3 @@ def fixed_n_coherent_state(fock, phi):
 
     preCalMulti = np.array([(multinomial_sqrt(x)) for x in fock.fockArray])
     return np.prod(phi[None, :] ** fock.fockArray, axis=1) * preCalMulti
-
-
-# Legacy alias for existing notebooks/scripts; to be dropped in Phase 5.
-coherent_state_number_projected = fixed_n_coherent_state

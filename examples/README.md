@@ -10,6 +10,7 @@ question, ends with self-check assertions, and is smoke-tested headless in CI
 | `ex02_operators.py` | operator assembly, hopping structure, ground state via Lanczos vs exact |
 | `ex03_krylov_complexity.py` | Krylov spread ⟨K̂⟩(t) after a staggered coherent quench |
 | `ex04_transmon_boson.py` | attractive bosons with disorder: eigenstate participation (IPR) in Fock space |
+| `ex05_symmetry_sectors.py` | momentum/parity blocks: spectrum reassembly and a Krylov quench computed inside one sector |
 
 Run:
 

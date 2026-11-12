@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- Symmetry sectors (`SymmetrySectors`, `SectorLabel`): crystal-momentum +
+  reflection-parity blocks for periodic chains, mirror-parity blocks for open
+  ones; `restrict`/`to_sector` feed Lanczos and Krylov runs in sector space
+  (issue #13).
 - Security policy (`SECURITY.md`, private vulnerability reporting) and issue
   templates (bug report, feature request).
 - Coding rules (`CODING_RULES.md`), contribution process (`CONTRIBUTING.md`), changelog.

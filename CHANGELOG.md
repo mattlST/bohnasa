@@ -20,11 +20,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   acting on flattened operators, never assembled as a matrix) and
   `operator_growth` (chain + <K̂>(t) of the Heisenberg-evolved operator), the
   sibling convention of `krylov_complexity` (issue #15).
-- Runnable examples `ex05_symmetry_sectors.py`, `ex06_momentum_spectra.py` and
-  `ex07_operator_growth.py`
+- State-resolved observables (`observables`): `one_body_density_matrix`,
+  `density_profile`, `orbital_occupations` (Penrose-Onsager condensate
+  fraction), `momentum_distribution`, `pair_correlation` (normal-ordered
+  density noise, basis-diagonal by construction), `structure_factor`
+  (issue #19).
+- Runnable examples `ex05_symmetry_sectors.py`, `ex06_momentum_spectra.py`,
+  `ex07_operator_growth.py` and `ex08_observables.py`
   (block reassembly, sector structure of a coherent quench, Krylov chain
   computed inside one sector, per-sector spectra vs analytic free bosons,
-  operator growth).
+  operator growth, state-resolved observables).
 - Security policy (`SECURITY.md`, private vulnerability reporting) and issue
   templates (bug report, feature request).
 - Coding rules (`CODING_RULES.md`), contribution process (`CONTRIBUTING.md`), changelog.

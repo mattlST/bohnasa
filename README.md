@@ -25,6 +25,11 @@ growth and Krylov complexity after a quench.
 - `SymmetrySectors` — crystal-momentum/parity block decomposition of the
   fixed-N space; diagonalization, Lanczos and Krylov chains cost roughly
   `1/L` per block once the state lives in a single sector
+- state-resolved observables — `one_body_density_matrix`,
+  `orbital_occupations` (Penrose-Onsager condensate fraction),
+  `momentum_distribution`, `pair_correlation` (bunching),
+  `structure_factor` (`S(0) = 0` on the fixed-N shell, shot-noise `S(k) = 1`
+  for the ideal condensate)
 - runnable [examples](examples/README.md) covering all of the above
 
 ## Install

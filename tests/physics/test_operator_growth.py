@@ -84,3 +84,36 @@ def test_free_density_closes_early_interacting_growth_sustains():
     # Krylov levels (pointwise curves oscillate; maxima are the stable claim)
     assert t_int.shape[0] == 61  # numVec + 1 rows: no happy breakdown yet
     assert k_int.max() > 3 * k_free.max()
+
+
+def test_complex_seed_pins_the_heisenberg_time_direction():
+    """<K>(t) is even in t for every seed (real-symmetric T_m), so the curve
+    cannot see the sign of exp(+iLt). The chain-RECONSTRUCTED operator O(t)
+    can: compare it against brute-force dense evolution of a genuinely
+    complex (non-Hermitian, non-phase-rotatable) seed, and check the wrong
+    time direction demonstrably disagrees."""
+    fock = bohnasa.FixedNFockSpace(2, 4)
+    ham = bohnasa.Hopping(fock) * (-1.0) + bohnasa.Interaction(fock) * 0.5
+    liouvillian = bohnasa.Liouvillian(ham)
+    d = liouvillian.dim
+
+    # c^dag_0 c_1 + 1j c^dag_2 c_3: off-diagonal monomials are traceless
+    seed = bohnasa.Correlator(fock, 1, 0).matrix + 1j * bohnasa.Correlator(fock, 3, 2).matrix
+    seed_flat = np.asarray(seed.toarray(), dtype=complex).reshape(-1)
+    seed_flat /= np.linalg.norm(seed_flat)
+
+    v, t_m = bohnasa.lanczos(seed_flat, liouvillian, d * d - 1)
+    eigval, eigvec = np.linalg.eigh(t_m)
+    coeffs0 = eigvec[0, :].conj()
+
+    hd = ham.matrix.toarray()
+    dense_superop = np.kron(hd, np.eye(d)) - np.kron(np.eye(d), hd.T)
+    t_probe = 0.7
+    forward = expm(1j * t_probe * dense_superop) @ seed_flat
+    backward = expm(-1j * t_probe * dense_superop) @ seed_flat
+
+    chain_coeffs = eigvec @ (np.exp(1j * eigval * t_probe) * coeffs0)
+    reconstructed = chain_coeffs @ v
+    assert np.abs(reconstructed - forward).max() < 1e-10
+    # the seed is not real up to a global phase, so the sign is observable:
+    assert np.abs(reconstructed - backward).max() > 1e-3

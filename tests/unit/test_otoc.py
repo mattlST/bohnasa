@@ -209,3 +209,159 @@ def test_method_auto_uses_stemr_for_tridiagonal_above_the_dense_limit():
     assert not oc_module._is_tridiagonal(H_ring.matrix)
     sc_ring = bohnasa.SquaredCommutator(H_ring, bohnasa.Number(ring, 0))
     assert sc_ring.method == "krylov"
+
+
+# ---------------------------------------------------------------------------
+# thermal (density-matrix) squared commutator - issue #28
+# ---------------------------------------------------------------------------
+
+
+def _thermal_none_brute(hd, od, beta, times):
+    """C_beta(t) = Tr(A^dag A rho) with A, rho assembled by dense expm only."""
+    rho = sla.expm(-beta * hd)
+    rho = rho / np.trace(rho).real
+    out = np.empty(len(times))
+    for i, t in enumerate(times):
+        u = sla.expm(-1j * t * hd)
+        ot = u.conj().T @ od @ u
+        a = ot @ od - od @ ot
+        out[i] = np.trace(a.conj().T @ a @ rho).real
+    return out
+
+
+def _thermal_symmetric_brute(hd, od, beta, times):
+    """C_beta^reg(t) = ||[O_tilde(t), O_tilde]||_F^2 with
+    O_tilde = rho^{1/8} O rho^{1/8} = Z^{-1/4} exp(-beta H / 8) O exp(-beta H / 8)."""
+    z = np.trace(sla.expm(-beta * hd)).real
+    x = sla.expm(-beta * hd / 8.0) @ od @ sla.expm(-beta * hd / 8.0)
+    out = np.empty(len(times))
+    for i, t in enumerate(times):
+        u = sla.expm(-1j * t * hd)
+        xt = u.conj().T @ x @ u
+        a = xt @ x - x @ xt
+        out[i] = np.sum(np.abs(a) ** 2) / z
+    return out
+
+
+def test_thermal_curve_matches_brute_force_density_matrix(dimer):
+    _, H, op, _ = dimer
+    hd, od = H.matrix.toarray(), op.matrix.toarray()
+    times = np.array([0.0, 0.4, 1.3, 2.0])
+    sc = oc.SquaredCommutator(H, op)
+    for beta in (0.0, 0.3, 1.0, 3.0, 12.0):
+        assert np.allclose(
+            sc.thermal_curve(times, beta),
+            _thermal_none_brute(hd, od, beta, times),
+            rtol=1e-8,
+            atol=1e-12,
+        )
+        assert np.allclose(
+            sc.thermal_curve(times, beta, regularization="symmetric"),
+            _thermal_symmetric_brute(hd, od, beta, times),
+            rtol=1e-8,
+            atol=1e-12,
+        )
+    assert sc.thermal_curve(times, 1.0)[0] == 0.0  # exact at the origin
+
+
+def test_thermal_curve_is_the_gibbs_average_of_eigenstate_curves(dimer):
+    """Definition invariant: C_beta(t) = sum_m p_m C_m(t) over energy
+    eigenstates with p_m = exp(-beta (E_m - E_0)) / Z."""
+    _, H, op, _ = dimer
+    sc = oc.SquaredCommutator(H, op)
+    times = np.linspace(0.0, 2.0, 5)
+    eps = np.asarray(sc._eps)
+    p = np.exp(-1.0 * (eps - eps[0]))
+    p = p / p.sum()
+    curves = np.array([sc.curve(sc._vecs[:, m], times) for m in range(sc.dim)])
+    assert np.allclose(sc.thermal_curve(times, 1.0), p @ curves, rtol=1e-9, atol=1e-14)
+
+
+def test_thermal_curve_beta_zero_is_maximally_mixed(dimer):
+    """beta = 0: equal weights over eigenstates, and for Hermitian O the
+    closed form C_0(t) = (2/dim)[Tr(O^2 O(t)^2) - Tr(O O(t) O O(t))];
+    both conventions coincide at infinite temperature."""
+    _, H, op, _ = dimer
+    sc = oc.SquaredCommutator(H, op)
+    hd, od = H.matrix.toarray(), op.matrix.toarray()
+    times = np.linspace(0.0, 2.0, 5)
+    c0 = sc.thermal_curve(times, 0.0)
+    eps, vecs = np.linalg.eigh(hd)
+    mean_eigen = np.array([sc.curve(vecs[:, m], times) for m in range(sc.dim)]).mean(axis=0)
+    assert np.allclose(c0, mean_eigen, rtol=1e-12, atol=1e-13)
+    for i, t in enumerate(times):
+        u = sla.expm(-1j * t * hd)
+        ot = u.conj().T @ od @ u
+        two_form = (2 / sc.dim) * (np.trace(od @ od @ ot @ ot) - np.trace(od @ ot @ od @ ot)).real
+        assert c0[i] == pytest.approx(two_form, rel=1e-9, abs=1e-12)
+    cs0 = sc.thermal_curve(times, 0.0, regularization="symmetric")
+    assert np.allclose(c0, cs0, rtol=1e-12, atol=1e-13)
+
+
+def test_thermal_curve_large_beta_reduces_to_ground_state(dimer):
+    """beta = 1e6 underflows every excitation in float64 (the shifted
+    Boltzmann factor needs beta * gap > 745 to hit exactly zero, which any
+    positive gap satisfies here): "none" becomes the ground-state curve,
+    "symmetric" vanishes exactly."""
+    _, H, op, _ = dimer
+    sc = oc.SquaredCommutator(H, op)
+    times = np.linspace(0.0, 2.0, 9)
+    ground = np.linalg.eigh(H.matrix.toarray())[1][:, 0]
+    assert np.allclose(
+        sc.thermal_curve(times, 1000000.0), sc.curve(ground, times), rtol=1e-9, atol=1e-14
+    )
+    assert sc.thermal_curve(times, 1000000.0, regularization="symmetric").max() == 0.0
+
+
+def test_thermal_curve_commuting_operator_is_zero_at_every_beta(dimer):
+    _, H, _, _ = dimer
+    sc = oc.SquaredCommutator(H, H)
+    times = np.linspace(0.0, 3.0, 13)
+    for beta in (0.0, 0.5, 7.0):
+        assert sc.thermal_curve(times, beta).max() < 1e-20
+        assert sc.thermal_curve(times, beta, regularization="symmetric").max() < 1e-20
+
+
+def test_thermal_curve_is_nonnegative_and_finite(dimer):
+    _, H, op, _ = dimer
+    sc = oc.SquaredCommutator(H, op)
+    times = np.linspace(0.0, 4.0, 21)
+    for beta in (0.0, 0.5, 2.0, 10.0):
+        for reg in ("none", "symmetric"):
+            c = sc.thermal_curve(times, beta, regularization=reg)
+            assert np.all(np.isfinite(c))
+            assert np.all(c >= 0.0)
+            assert c[0] == 0.0
+
+
+def test_thermal_curve_caches_eigenbasis_operator(dimer):
+    _, H, op, state = dimer
+    sc = oc.SquaredCommutator(H, op)
+    assert sc._thermal_w is None  # lazy: the pure curve never triggers it
+    times = np.linspace(0.0, 1.0, 5)
+    assert sc.curve(state, times)[1] > 0.0
+    assert sc._thermal_w is None
+    first = sc.thermal_curve(times, 1.0)
+    assert sc._thermal_w is not None and sc._thermal_w.shape == (sc.dim, sc.dim)
+    assert np.array_equal(first, sc.thermal_curve(times, 1.0))  # cache reuse, stable
+
+
+def test_thermal_curve_validation(dimer):
+    _, H, op, _ = dimer
+    sc = oc.SquaredCommutator(H, op)
+    times = np.linspace(0.0, 1.0, 3)
+    with pytest.raises(ValueError, match="eig path"):
+        oc.SquaredCommutator(H, op, method="krylov").thermal_curve(times, 1.0)
+    u = sla.expm(-1j * 0.3 * H.matrix.toarray())
+    with pytest.raises(ValueError, match="eig path"):
+        oc.SquaredCommutator.from_propagator(u, op).thermal_curve(times, 1.0)
+    with pytest.raises(ValueError, match="nonnegative"):
+        sc.thermal_curve(times, -1.0)
+    with pytest.raises(ValueError, match="nonnegative"):
+        sc.thermal_curve(times, np.inf)
+    with pytest.raises(ValueError, match="nonnegative"):
+        sc.thermal_curve(times, np.nan)
+    with pytest.raises(ValueError, match="unknown regularization"):
+        sc.thermal_curve(times, 1.0, regularization="magic")
+    with pytest.raises(ValueError, match="one-dimensional"):
+        sc.thermal_curve(np.zeros((3, 2)), 1.0)

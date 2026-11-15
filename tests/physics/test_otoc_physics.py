@@ -1,10 +1,14 @@
-"""Physics anchors of the OTOC module (issue #22).
+"""Physics anchors of the OTOC module (issues #22, #28).
 
 Quantum curves are pinned against analytic short-time coefficients, against
 the closed-form classical mean-field instability of the dimer, and against
-boundedness in the regular regime. The dimer is dimension N+1, so even
-N = 256 is CI-cheap; the one heavy lattice run (dim 5151) is gated behind
-the BOHNASA_SLOW_TESTS environment variable and stays local.
+boundedness in the regular regime. The thermal (Gibbs-state) curve is pinned
+on the periodic trimer - the thermal-OTOC reference system of thesis
+Sec. 7.4 - by its zero-temperature and infinite-temperature limits, the
+regularization invariants and a brute-force density-matrix cross-check.
+The dimer is dimension N+1, so even N = 256 is CI-cheap; the one heavy
+lattice run (dim 5151) is gated behind the BOHNASA_SLOW_TESTS environment
+variable and stays local.
 """
 
 import os
@@ -183,6 +187,90 @@ def test_backward_prepared_probe_sustains_growth_longer():
     c_bare = sc.curve(psi, times)
     c_pre = sc.curve(psi_pre, times)
     assert _slope(times, c_pre, 4.0, 7.0) > _slope(times, c_bare, 4.0, 7.0)
+
+
+def _trimer(N):
+    """Periodic trimer (L = 3) at filling N with U = 1/N - the thermal-OTOC
+    reference system of thesis Sec. 7.4."""
+    fock = bohnasa.FixedNFockSpace(N, 3)
+    t = np.zeros((3, 3))
+    for site in range(3):
+        nxt = (site + 1) % 3
+        t[nxt, site] = t[site, nxt] = -1.0
+    H = bohnasa.Hamiltonian(fock, one_body=t, onsite_u=1.0 / N)
+    op = bohnasa.Number(fock, 0)
+    return fock, H, op
+
+
+def test_trimer_thermal_curve_reduces_to_ground_and_maximally_mixed_limits():
+    """(a) beta -> infinity becomes the ground-state curve (the shifted
+    Boltzmann weights underflow to exact zeros at any gap > 745/beta);
+    (b) beta = 0 is the maximally-mixed average: the mean over all eigenstate
+    curves AND the closed 2/dim [Tr(O^2 O(t)^2) - Tr(O O(t) O O(t))] form
+    for Hermitian O."""
+    fock, H, op = _trimer(20)  # dim 231
+    sc = oc.SquaredCommutator(H, op)
+    times = np.linspace(0.0, 3.0, 13)
+    eps, vecs = np.linalg.eigh(H.matrix.toarray())
+    assert eps[1] - eps[0] > 3.0  # => beta = 1000 weights are exactly [1, 0, ...]
+    thermal_inf = sc.thermal_curve(times, 1000.0)
+    ground_curve = sc.curve(vecs[:, 0], times)
+    assert thermal_inf[0] == 0.0
+    assert np.abs(thermal_inf - ground_curve).max() < 1e-11  # observed 1.2e-12
+
+    c0 = sc.thermal_curve(times, 0.0)
+    eigen_mean = np.array([sc.curve(vecs[:, m], times) for m in range(sc.dim)]).mean(axis=0)
+    assert np.abs(c0 - eigen_mean).max() / c0.max() < 1e-12  # observed 1.2e-15
+    hd, od = H.matrix.toarray(), op.matrix.toarray()
+    for i in (1, 5, 12):
+        u = sla.expm(-1j * times[i] * hd)
+        ot = u.conj().T @ od @ u
+        two_form = (2 / sc.dim) * (np.trace(od @ od @ ot @ ot) - np.trace(od @ ot @ od @ ot)).real
+        assert c0[i] == pytest.approx(two_form, rel=1e-10, abs=1e-11)
+
+
+def test_trimer_thermal_symmetric_regularization_invariants():
+    """Thesis Sec. 7.1 / App. D convention: the symmetric rho^{1/8} weighting
+    agrees with the unregularized curve at beta = 0, vanishes exactly at
+    beta -> infinity (identity/pure-state contribution removed), annihilates
+    commuting operators at every beta, and stays nonnegative."""
+    _, H, op = _trimer(20)
+    sc = oc.SquaredCommutator(H, op)
+    times = np.linspace(0.0, 3.0, 13)
+    assert sc.thermal_curve(times, 1000.0, regularization="symmetric").max() == 0.0
+    c0_none = sc.thermal_curve(times, 0.0)
+    c0_sym = sc.thermal_curve(times, 0.0, regularization="symmetric")
+    assert np.abs(c0_sym - c0_none).max() / c0_none.max() < 1e-13  # observed 4.0e-16
+    for beta in (0.0, 0.5, 2.0, 10.0):
+        for reg in ("none", "symmetric"):
+            c = sc.thermal_curve(times, beta, regularization=reg)
+            assert np.all(np.isfinite(c))
+            assert np.all(c >= 0.0)
+            assert c[0] == 0.0
+    sch = oc.SquaredCommutator(H, H)
+    for beta in (0.0, 2.0):
+        assert sch.thermal_curve(times, beta).max() < 1e-20  # observed 6.1e-24
+        assert sch.thermal_curve(times, beta, regularization="symmetric").max() < 1e-20
+
+
+def test_trimer_thermal_curve_matches_brute_force_density_matrix():
+    """Independent path: C_beta(t) = Tr(A^dag A rho) with A = [O(t), O] and
+    rho = exp(-beta H)/Z assembled by dense expm only - no eigenbasis,
+    no weights - cross-checks the spectral contraction at finite beta."""
+    _, H, op = _trimer(20)
+    sc = oc.SquaredCommutator(H, op)
+    hd, od = H.matrix.toarray(), op.matrix.toarray()
+    times = np.array([0.75, 1.5, 2.75])
+    for beta in (0.5, 2.0):
+        rho = sla.expm(-beta * hd)
+        rho = rho / np.trace(rho).real
+        for t in times:
+            u = sla.expm(-1j * t * hd)
+            a = (u.conj().T @ od @ u) @ od - od @ (u.conj().T @ od @ u)
+            brute = np.trace(a.conj().T @ a @ rho).real
+            assert sc.thermal_curve(np.array([t]), beta)[0] == pytest.approx(
+                brute, rel=1e-9, abs=1e-11
+            )
 
 
 @pytest.mark.skipif(

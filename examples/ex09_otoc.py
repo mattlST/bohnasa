@@ -13,7 +13,10 @@ dimensional, the sweep reaches the largest systems for free.
 This example moves in the direction of the continuous-dimer analysis in
 the author's doctoral thesis (see CITATION.cff), whose Figure 4.1 frames
 the time-scale structure and Figure 4.4 shows the OTOC N-ladder
-reproduced here at CI-reachable sizes.
+reproduced here at CI-reachable sizes. The last panel adds the thermal
+(Gibbs-state) squared commutator: unregularized curves interpolating
+between infinite and zero temperature, and the regularized ("symmetric")
+convention of thesis Sec. 7.1, which removes the identity/pure-state part.
 """
 
 import matplotlib.pyplot as plt
@@ -112,4 +115,43 @@ ax_rate.set_ylabel(r"$\mathrm{d} \log (C/\beta^2) / \mathrm{d}t$")
 ax_rate.set_title("effective rate")
 ax_rate.legend(fontsize=8)
 fig.tight_layout()
+
+# --- thermal (Gibbs-state) curves C_beta(t) on the N = 40 dimer ---
+# The unregularized thermal curve interpolates between the maximally-mixed
+# average (beta = 0) and the pure ground-state curve (beta -> inf); the
+# regularized ("symmetric") convention shares the rho^{1/8} weights over the
+# correlator (thesis Sec. 7.1, App. D), removes that identity/pure-state part
+# and therefore vanishes at zero temperature.
+fock_th, H_th, op_th, _ = dimer_case(40)
+sc_th = SquaredCommutator(H_th, op_th)
+ns_th = np.linspace(0.002, 6.0, 400)
+c_gs = sc_th.curve(np.linalg.eigh(H_th.matrix.toarray())[1][:, 0], ns_th)
+fig_th, ax_th = plt.subplots(figsize=(5.6, 4.2))
+for b, style in ((0.0, "-"), (0.5, "--"), (2.0, "-.")):
+    ax_th.semilogy(ns_th, sc_th.thermal_curve(ns_th, b), style, label=f"beta = {b}")
+ax_th.semilogy(
+    ns_th,
+    sc_th.thermal_curve(ns_th, 0.5, regularization="symmetric"),
+    color="purple",
+    ls=":",
+    label="beta = 0.5, regularized",
+)
+ax_th.semilogy(ns_th, c_gs, color="grey", ls=":", label="ground state (beta -> inf)")
+# the same invariants the test suite pins (issue #28):
+assert np.allclose(sc_th.thermal_curve(ns_th, 1.0e6), c_gs, rtol=1e-9, atol=1e-14)
+assert sc_th.thermal_curve(ns_th, 1.0e6, regularization="symmetric").max() == 0.0
+assert np.allclose(
+    sc_th.thermal_curve(ns_th, 0.0, regularization="symmetric"),
+    sc_th.thermal_curve(ns_th, 0.0),
+    rtol=1e-9,
+)
+ax_th.set_xlabel("time")
+ax_th.set_ylabel(r"$C_\beta(t)$")
+ax_th.set_title("thermal squared commutator, dimer (N = 40)")
+ax_th.legend(fontsize=8)
+fig_th.tight_layout()
+c_end = ", ".join(
+    f"beta = {b}: {sc_th.thermal_curve(np.array([6.0]), b)[0]:.6f}" for b in (0.0, 0.5, 2.0)
+)
+print(f"thermal C(t = 6): {c_end}, ground state: {c_gs[-1]:.6f}")
 plt.show()

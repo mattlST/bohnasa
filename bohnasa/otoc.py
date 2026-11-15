@@ -11,9 +11,14 @@ which needs only state propagations and never assembles the dim^2 x dim^2
 Liouville machinery.
 
 Scope of the operator form: the *same-operator* (auto-)commutator
-``[O(t), O]``; the general asymmetric ``[O_1(t), O_2]`` and thermal
-regularizations are not implemented (follow-up issues). Pure states
-only; density-matrix input is rejected.
+``[O(t), O]``; the general asymmetric ``[O_1(t), O_2]`` is not
+implemented (follow-up issue). Thermal states enter through the Gibbs
+expectation of the squared commutator,
+``C_beta(t) = Tr([O(t), O]^dag [O(t), O] rho_beta)``
+(:meth:`SquaredCommutator.thermal_curve`), evaluated as a
+Boltzmann-weighted contraction over the energy eigenbasis - still no
+Liouville-space assembly. ``curve`` and ``commuted`` remain pure-state
+probes; generic (non-Gibbs) density-matrix evolution is out of scope.
 The classical reference line for the growth rates is
 :mod:`bohnasa.classical_mean_field`.
 """
@@ -63,11 +68,14 @@ class SquaredCommutator:
 
     Binds a Hamiltonian and an operator once (mirroring
     :class:`~bohnasa.krylov.Liouvillian`), then evaluates ``C(t)`` for any
-    probe state. Propagation paths:
+    probe state - or the Gibbs-state curve ``C_beta(t)`` via
+    :meth:`thermal_curve`. Propagation paths:
 
     - ``method="eig"`` (default for ``dim <= 2000`` or tridiagonal ``H``):
       one eigendecomposition (STEMR for tridiagonal), curve evaluated as
-      blocked spectral matrix-products, ``O(dim^2)`` memory;
+      blocked spectral matrix-products, ``O(dim^2)`` memory - the only
+      path that also serves :meth:`thermal_curve` (it needs the full
+      energy eigenbasis for the Boltzmann weights);
     - ``method="krylov"`` (default above the threshold): ``expm_multiply``
       per propagation, ``O(dim)`` memory - the path that reaches the large
       systems;
@@ -118,6 +126,7 @@ class SquaredCommutator:
         self._eps: np.ndarray | None = None
         self._vecs: np.ndarray | None = None
         self._htrace: complex | None = None
+        self._thermal_w: np.ndarray | None = None
         if method == "auto":
             # a tridiagonal Hamiltonian (dimer: always; ring fixed-N: sparse
             # but wider band) is cheap to fully diagonalize at any size, so
@@ -150,6 +159,7 @@ class SquaredCommutator:
         obj._h = None
         obj._eps = None
         obj._vecs = None
+        obj._thermal_w = None
         obj._propagator = u
         obj.method = "floquet"
         return obj
@@ -278,4 +288,158 @@ class SquaredCommutator:
             d = term1 - term2
             out[s : s + len(tt)] = (np.abs(d) ** 2).sum(axis=0)
         out[times == 0] = 0.0  # exact, like commuted() short-circuits
+        return out
+
+    def _operator_in_eigenbasis(self) -> np.ndarray:
+        """``O`` in the energy eigenbasis, computed once and cached.
+
+        Follows the ``H.eigval``/``H.eigvec`` lazy-caching pattern of
+        :func:`bohnasa.time_evolution.time_evolution_exact_ind`; the cache
+        lives on this instance because the matrix needs the Hamiltonian
+        eigenvectors and the probe operator together. Dense ``dim x dim``
+        conversion is justified: the spectral thermal contraction is an
+        ``O(dim^2)``-memory / ``O(dim^3)``-per-time-point path of the same
+        memory class as :meth:`_curve_spectral` (never the ``dim^2 x dim^2``
+        Liouville operator).
+        """
+        if self._thermal_w is None:
+            assert self._vecs is not None  # eig path, checked by caller
+            self._thermal_w = self._vecs.conj().T @ (self._o @ self._vecs)
+        return self._thermal_w
+
+    def thermal_curve(
+        self, times: np.ndarray, beta: float, regularization: str = "none"
+    ) -> np.ndarray:
+        r"""Gibbs-state squared commutator ``C_beta(t)`` at inverse temperature ``beta``.
+
+        For ``rho_beta = exp(-beta H) / Z(beta)`` with ``Z(beta) = Tr exp(-beta H)``,
+        the thermal squared commutator is the Gibbs expectation
+
+        .. math::
+            C_\beta(t) = \mathrm{Tr}\!\left( [O(t),O]^\dagger [O(t),O] \, \rho_\beta
+            \right) = \sum_m p_m \, \bigl\lVert [O(t),O] \lvert E_m\rangle
+            \bigr\rVert^2 , \qquad p_m = e^{-\beta E_m} / Z(\beta) .
+
+        In the energy eigenbasis ``rho_beta`` is diagonal, so the trace becomes a
+        Boltzmann-weighted contraction over eigenstates: ``[O(t), O]`` is built
+        from the cached eigenbasis matrix :meth:`_operator_in_eigenbasis` by two
+        dense ``dim x dim`` products per time point, mirroring the blocked
+        gemm philosophy of :meth:`_curve_spectral` - no eigenvector is ever
+        propagated and no ``dim^2 x dim^2`` Liouville operator is assembled.
+        The weights use ``exp(-beta * (E_m - E_0))``: the ground shift cancels
+        exactly against ``Z(beta)``, cannot overflow, and underflows cleanly to
+        zero, so large ``beta`` is numerically stable.
+
+        Parameters
+        ----------
+        times : numpy.ndarray
+            Times of the curve (any real values; ``t = 0`` yields exactly 0).
+        beta : float
+            Inverse temperature, finite and ``beta >= 0``. ``beta = 0`` is the
+            maximally-mixed (infinite-temperature) state; large ``beta``
+            approaches the ground state (see Examples).
+        regularization : {"none", "symmetric"}, default "none"
+            ``"none"``: the definition above - the Gibbs weight enters once,
+            on the traced slot. ``"symmetric"``: the regularized convention
+            (thesis Sec. 7.1, App. D), which shares the state weight
+            symmetrically over the correlator: ``O_tilde = rho_beta^{1/8} O
+            rho_beta^{1/8}`` has eigenbasis elements ``(p_n p_m)^{1/8} O_{nm}``
+            and the curve is ``||[O_tilde(t), O_tilde]||_F^2``. Each external
+            index then carries the eighth root of the weights from its own
+            vertex (total ``(p_n p_m)^{1/4}`` per squared element) and every
+            contracted intermediate eigenstate ``p_k^{1/4}``, so thermally
+            unpopulated levels enter suppressed by their own occupation. As
+            ``beta -> infinity`` the weighted operator collapses to
+            ``<O>_0 |E_0><E_0|``, commuting with its own time evolution, and
+            the regularized curve vanishes identically: the trivial
+            identity/pure-state contribution - the part of the unregularized
+            curve that survives as the ground-state curve at zero temperature -
+            is removed, leaving only the genuinely mixed-state growth. At
+            ``beta = 0`` both conventions coincide to machine precision.
+
+        Returns
+        -------
+        numpy.ndarray of float
+            Nonnegative curve, ``C_beta(t) >= 0`` (sum of weighted squared
+            norms), ``C_beta(0) = 0`` exactly and identically zero when ``O``
+            commutes with ``H``, for every ``beta`` and either regularization.
+
+        Raises
+        ------
+        ValueError
+            If the instance is not on the ``"eig"`` path (the thermal curve
+            needs the full energy eigenbasis: rebuild with ``method="eig"``),
+            or ``beta`` is not finite/nonnegative, or ``regularization`` is
+            unknown, or ``times`` is not one-dimensional.
+
+        Notes
+        -----
+        Cost per time point is two dense ``dim x dim`` complex matrix
+        products: ``O(dim^3)`` flops, ``O(dim^2)`` memory - measured on a
+        16-core CPU at 0.5 s ("none") / 0.9 s ("symmetric") for a 25-point
+        curve at ``dim = 561`` (the interacting trimer at ``N = 32``). A
+        literal mixed-state generalization of :meth:`curve` would instead
+        propagate all ``dim`` eigenvectors per time point; the spectral
+        contraction replaces those propagations entirely.
+
+        Examples
+        --------
+        >>> import numpy as np
+        >>> from bohnasa import FixedNFockSpace, Hamiltonian, Number
+        >>> fock = FixedNFockSpace(6, 2)
+        >>> t = np.array([[0.0, -2.0], [-2.0, 0.0]])
+        >>> H = Hamiltonian(fock, one_body=t, onsite_u=0.8)
+        >>> O = (Number(fock, 0) - Number(fock, 1)) * 0.5
+        >>> sc = SquaredCommutator(H, O)
+        >>> times = np.linspace(0.0, 2.0, 9)
+        >>> float(sc.thermal_curve(times, beta=0.5)[0])
+        0.0
+        >>> float(np.round(sc.thermal_curve(times, 0.5)[-1], 10))
+        5.2557003433
+        >>> float(np.round(sc.thermal_curve(times, 0.5, regularization="symmetric")[-1], 10))
+        1.1229170006
+        >>> ground = np.linalg.eigh(H.matrix.toarray())[1][:, 0]
+        >>> bool(np.allclose(sc.thermal_curve(times, 1000.0), sc.curve(ground, times)))
+        True
+        >>> bool(np.allclose(sc.thermal_curve(times, 0.0),
+        ...                  sc.thermal_curve(times, 0.0, regularization="symmetric")))
+        True
+        >>> float(sc.thermal_curve(times, 1000.0, regularization="symmetric").max())
+        0.0
+        """
+        if self.method != "eig":
+            raise ValueError(
+                "SquaredCommutator: thermal_curve requires the eig path (the full "
+                f"energy eigenbasis), got method={self.method!r}; rebuild with method='eig'"
+            )
+        assert self._eps is not None  # set by __init__ for method == "eig"
+        if regularization not in ("none", "symmetric"):
+            raise ValueError(f"SquaredCommutator: unknown regularization {regularization!r}")
+        b = float(beta)
+        if not np.isfinite(b) or b < 0:
+            raise ValueError(f"SquaredCommutator: beta must be finite and nonnegative, got {beta}")
+        eps = self._eps
+        times = np.asarray(times, dtype=float)
+        if times.ndim != 1:
+            raise ValueError(f"SquaredCommutator: times must be one-dimensional, got {times.shape}")
+        p = np.exp(-b * (eps - eps[0]))
+        p /= p.sum()
+        o_e = self._operator_in_eigenbasis()
+        if regularization == "symmetric":
+            # geometric-mean weight (p_n p_m)^(1/8) on both slots of O
+            o_e = o_e * (p**0.125)[:, None] * (p**0.125)[None, :]
+        # "none": Gibbs weight sits fully on the traced slot (columns of A);
+        # "symmetric": the weights are already inside o_e (plain Frobenius)
+        col = np.sqrt(p) if regularization == "none" else None
+        out = np.empty(len(times), dtype=float)
+        for i, tt in enumerate(times):
+            if tt == 0:
+                out[i] = 0.0  # O(0) = O: the commutator vanishes exactly
+                continue
+            ph = np.exp(-1j * eps * tt)
+            o_t = o_e * (np.conj(ph)[:, None] * ph[None, :])  # O(t) in eigenbasis
+            d = o_t @ o_e - o_e @ o_t
+            if col is not None:
+                d = d * col[None, :]
+            out[i] = float(np.sum(np.abs(d) ** 2))
         return out

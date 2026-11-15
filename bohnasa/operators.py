@@ -195,6 +195,15 @@ class Hopping(Operator):
     ValueError
         If an explicit bond list is not 2-dimensional with shape ``(*, 2)``.
 
+    Notes
+    -----
+    For ``connections="pbc"`` at ``L = 2`` the ring's single bond is counted
+    from both ends, giving hopping amplitude ``2J`` across the dimer. This
+    is the deliberate convention (it keeps the L = 2 ring topologically
+    consistent with the general periodic chain), not a defect - use the
+    :class:`Hamiltonian` builder with an explicit ``one_body`` matrix for a
+    deduplicated bond.
+
     Examples
     --------
     >>> from bohnasa import FixedNFockSpace

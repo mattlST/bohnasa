@@ -1,6 +1,7 @@
 from math import factorial, sqrt
 
 import numpy as np
+import pytest
 
 import bohnasa
 
@@ -66,3 +67,23 @@ def test_coherent_state_global_phase_covariance():
     psi1 = bohnasa.fixed_n_coherent_state(fock, phi.copy())
     psi2 = bohnasa.fixed_n_coherent_state(fock, phi * np.exp(1j * theta))
     assert np.allclose(psi2, psi1 * np.exp(1j * theta * N))
+
+
+def test_coherent_state_large_N_is_finite_and_normalized():
+    """Log-space construction: the multinomial prefactor never
+    materializes, so N = 4096 (sqrt(N!) alone exceeds float64) builds
+    exact amplitudes instead of inf * 0 = NaN."""
+    N = 4096
+    fock = bohnasa.FixedNFockSpace(N, 2)
+    psi = bohnasa.fixed_n_coherent_state(fock, np.array([1.0, -1.0]) / np.sqrt(2.0))
+    assert np.all(np.isfinite(psi))
+    assert np.linalg.norm(psi) == pytest.approx(1.0, abs=1e-12)
+
+
+def test_coherent_state_empty_mode_is_exactly_zero():
+    fock = bohnasa.FixedNFockSpace(20, 3)
+    psi = bohnasa.fixed_n_coherent_state(fock, np.array([1.0, 0.0, 1.0]))
+    occ = fock.fockArray
+    assert psi[occ[:, 1] > 0].size > 0
+    assert np.all(psi[occ[:, 1] > 0] == 0.0)
+    assert np.linalg.norm(psi) == pytest.approx(1.0)

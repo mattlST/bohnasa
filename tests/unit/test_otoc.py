@@ -111,6 +111,20 @@ def test_input_validation(dimer):
         oc.SquaredCommutator(H, bohnasa.Number(other, 0))
 
 
+def test_tan_units_match_legacy_cos_sin_form():
+    """dimer_lambda is expressed in tan(theta) units (PR #23 review); this
+    pins it against the original cos/sin form to machine precision across
+    the parameter line."""
+    grid = np.linspace(0.6, 1.55, 200)
+
+    def legacy_lambda(th):
+        c, u = np.cos(th), np.sin(th)
+        mu2 = 8.0 * c * (u - 2.0 * c)
+        return float(np.sqrt(mu2)) if mu2 > 0.0 else 0.0
+
+    assert max(abs(mf.dimer_lambda(th) - legacy_lambda(th)) for th in grid) < 1e-13
+
+
 def test_density_matrix_input_is_rejected(dimer):
     """Pure-state scope: a density matrix must fail with the explicit mixed-
     state message, not the generic shape error (which invites flattening)."""

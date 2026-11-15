@@ -8,7 +8,12 @@ chaos. Evaluated by the VECTOR TRICK,
                      - O exp(iHt) O exp(-iHt) |psi>,
 
 which needs only state propagations and never assembles the dim^2 x dim^2
-Liouville machinery. Pure states only; density-matrix input is rejected.
+Liouville machinery.
+
+Scope of the operator form: the *same-operator* (auto-)commutator
+``[O(t), O]``; the general asymmetric ``[O_1(t), O_2]`` and thermal
+regularizations are not implemented (follow-up issues). Pure states
+only; density-matrix input is rejected.
 The classical reference line for the growth rates is
 :mod:`bohnasa.classical_mean_field`.
 """

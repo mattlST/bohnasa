@@ -10,6 +10,9 @@ Dimer convention: quarter-circle coupling ``J = cos(theta)``,
 ``U = 2 sin(theta)/N``, so the classical flow is ``N``-independent. The
 two-mode canonical pair ``{phi, s} = 2/N`` (both modes contribute) sets the
 factor 2 in the flow equations.
+
+Convention, closed forms and the pitchfork structure follow the doctoral
+thesis cited in ``CITATION.cff`` (quarter-circle system, off-phase saddle).
 """
 
 import numpy as np
@@ -42,7 +45,10 @@ def dimer_lambda(theta: float) -> float:
     >>> round(dimer_lambda(1.35), 4)
     0.9706
     """
-    mu2 = 8.0 * np.cos(theta) * (np.sin(theta) - 2.0 * np.cos(theta))
+    # mu^2 = 8 cos^2 (tan - 2): instability window is literally tan > 2,
+    # and cos^2 = 1/(1 + tan^2)
+    t = np.tan(theta)
+    mu2 = 8.0 * (t - 2.0) / (1.0 + t * t)
     return float(np.sqrt(mu2)) if mu2 > 0.0 else 0.0
 
 

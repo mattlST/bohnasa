@@ -1,6 +1,7 @@
 from .classical_mean_field import *
 from .fock_space import *
 from .krylov import *
+from .mean_field_lattice import *
 from .observables import *
 from .operators import *
 from .otoc import *

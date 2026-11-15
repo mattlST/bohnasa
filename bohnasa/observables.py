@@ -75,6 +75,15 @@ def density_profile(state, fock):
     ``sum_r |state_r|^2 * fockArray[r, i]``; agrees with ``Number(fock, i).
     eval_mean(state)`` and with ``diag(one_body_density_matrix(...))`` up to
     that route's floating noise.
+
+    Examples
+    --------
+    >>> from bohnasa import FixedNFockSpace
+    >>> fock = FixedNFockSpace(1, 3)
+    >>> state = np.zeros(fock.dim, dtype=complex)
+    >>> state[fock.dict[(0, 1, 0)]] = 1.0
+    >>> density_profile(state, fock)
+    array([0., 1., 0.])
     """
     state = _validated(state, fock)
     probs = np.abs(state) ** 2
@@ -89,6 +98,15 @@ def orbital_occupations(state, fock):
     condensate fraction, and ``sum(nu) = N`` with ``0 <= nu`` for every
     state. The free ring ground state gives exactly ``(N, 0, ..., 0)``; a
     Fock-basis eigenstate gives its own sorted occupation numbers.
+
+    Examples
+    --------
+    >>> from bohnasa import FixedNFockSpace
+    >>> fock = FixedNFockSpace(2, 3)
+    >>> state = np.zeros(fock.dim, dtype=complex)
+    >>> state[fock.dict[(2, 0, 0)]] = 1.0
+    >>> orbital_occupations(state, fock)
+    array([2., 0., 0.])
     """
     gamma = one_body_density_matrix(state, fock)
     nu = np.linalg.eigvalsh(gamma)
@@ -105,6 +123,15 @@ def momentum_distribution(state, fock):
     elsewhere; a Fock eigenstate gives the flat ``N / L``. The momentum
     convention assumes periodic boundary conditions; it is documented, not
     enforced.
+
+    Examples
+    --------
+    >>> from bohnasa import FixedNFockSpace
+    >>> fock = FixedNFockSpace(1, 3)
+    >>> state = np.zeros(fock.dim, dtype=complex)
+    >>> state[fock.dict[(0, 0, 1)]] = 1.0
+    >>> float(np.round(momentum_distribution(state, fock).sum(), 12))
+    1.0
     """
     gamma = one_body_density_matrix(state, fock)
     k = 2.0 * np.pi * np.arange(fock.L) / fock.L
@@ -127,6 +154,15 @@ def pair_correlation(state, fock):
     ``<n_i><n_j>`` is ``(N - 1)/N``); a unit-occupation eigenstate gives
     vanishing on-site pair correlation (no doublons) and exact classical
     correlation ``G2_ij = n_i n_j`` off-diagonal.
+
+    Examples
+    --------
+    >>> from bohnasa import FixedNFockSpace
+    >>> fock = FixedNFockSpace(2, 3)
+    >>> state = np.zeros(fock.dim, dtype=complex)
+    >>> state[fock.dict[(2, 0, 0)]] = 1.0
+    >>> float(pair_correlation(state, fock)[0, 0])
+    2.0
     """
     state = _validated(state, fock)
     probs = np.abs(state) ** 2

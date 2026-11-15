@@ -37,6 +37,12 @@ growth and Krylov complexity after a quench.
   (unregularized and symmetric-regularized conventions), and the exact
   mean-field counterpart of the dimer (`dimer_lambda`,
   `dimer_fixed_points`, `mean_field_flow`) as its classical reference line
+- `MeanFieldLattice` — the general L-site classical mean-field (DNLS)
+  engine: hand-coded flow and analytic Jacobian under `solve_ivp`,
+  energy/norm-conserving trajectories, branch search for relative fixed
+  points, rotating-frame stability spectra and maximal Lyapunov exponents
+  (Benettin / two-trajectory / QR), with the dimer as the exact L = 2
+  special case
 - runnable [examples](examples/README.md) covering all of the above
 
 ## Install

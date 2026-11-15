@@ -51,6 +51,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   computed inside one sector, per-sector spectra vs analytic free bosons,
   operator growth, state-resolved observables, OTOC Ehrenfest window,
   Trotterized kicked dimer).
+- General L-site classical mean-field engine `MeanFieldLattice`
+  (`mean_field_lattice`): the discrete-nonlinear-Schrodinger / mean-field
+  Bose-Hubbard lattice in real `(q, p)` phase space with hand-coded numpy
+  flow and analytic Jacobian feeding `solve_ivp` (no symbolic gradient
+  generation), conserved energy and particle number, rotating-frame fixed
+  points with a deterministic branch search, stability spectra and maximal
+  Lyapunov exponents by three independent methods (Benettin
+  renormalization, two-trajectory separation, QR flow). The closed-form
+  dimer is the exact `L = 2` special case (quarter-circle convention, the
+  PBC two-site ring counting its single bond twice); reduction,
+  conservation, symplecticity and Lyapunov cross-checks are pinned as
+  physics invariants. Example `ex11_mean_field_lattice.py` accompanies it
+  (issue #26).
 - Security policy (`SECURITY.md`, private vulnerability reporting) and issue
   templates (bug report, feature request).
 - Coding rules (`CODING_RULES.md`), contribution process (`CONTRIBUTING.md`), changelog.

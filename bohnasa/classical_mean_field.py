@@ -4,7 +4,9 @@ The mean-field counterpart of the lattice Bose-Hubbard model is a discrete
 nonlinear Schrodinger flow on coherent-state amplitudes. This module holds
 the closed-form dimer (L = 2) results - fixed points, stability exponent,
 flow - which serve as the exact reference line for the quantum growth
-rates of :class:`bohnasa.SquaredCommutator`.
+rates of :class:`bohnasa.SquaredCommutator`; the general L-site engine,
+of which the dimer is the L = 2 special case, is
+:class:`bohnasa.MeanFieldLattice` in :mod:`bohnasa.mean_field_lattice`.
 
 Dimer convention: quarter-circle coupling ``J = cos(theta)``,
 ``U = 2 sin(theta)/N``, so the classical flow is ``N``-independent. The

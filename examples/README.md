@@ -14,6 +14,8 @@ question, ends with self-check assertions, and is smoke-tested headless in CI
 | `ex06_momentum_spectra.py` | per-sector eigenvalues vs the analytic free-boson solution, and interacting ladders with the k/−k degeneracy |
 | `ex07_operator_growth.py` | Liouvillian operator growth: Krylov spread of a local density, free closure vs interacting climb |
 | `ex08_observables.py` | state diagnostics: occupations, momentum distribution, bunching and S(k), pinned on exact plane-wave anchors |
+| `ex09_otoc.py` | squared-commutator scrambling growth and its Ehrenfest window across particle numbers |
+| `ex10_kicked_dimer.py` | Trotterized dimer driving: small periods regain the continuous curve, larger ones weaken the growth rate |
 
 Run:
 

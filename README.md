@@ -94,4 +94,7 @@ breakage.
 ## License & citation
 
 MIT — see [LICENSE](LICENSE). If you use this in published work, please cite
-via `CITATION.cff`.
+via `CITATION.cff`. The methods behind the OTOC and mean-field modules
+follow the author's doctoral thesis, *Signatures of Instability in Bosonic
+Many-Body Systems* (Universität Regensburg, 2025), publicly cited in
+`CITATION.cff`.

@@ -9,6 +9,11 @@ growth rate lambda_s; quantum mechanically the squared commutator C(t)
 grows at rate 2*lambda_s in the early window and saturates on a time scale
 ln N / lambda_s - the Ehrenfest time. Since the dimer is only N+1
 dimensional, the sweep reaches the largest systems for free.
+
+This example moves in the direction of the continuous-dimer analysis in
+the author's doctoral thesis (see CITATION.cff), whose Figure 4.1 frames
+the time-scale structure and Figure 4.4 shows the OTOC N-ladder
+reproduced here at CI-reachable sizes.
 """
 
 import matplotlib.pyplot as plt

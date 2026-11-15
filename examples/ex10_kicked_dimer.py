@@ -6,9 +6,11 @@ driven periodically instead?
 Floquet form of the dimer with fixed coupling (theta = 1.35): one period is
 a kick of the full on-site interaction followed by a hop, both of duration
 tau, so U_F = exp(-i tau H_hop) exp(-i tau H_int) with the kick PERIOD as
-control parameter. N = 1000 reproduces the parameter table of the original
-study's kicked-dimer figure (tau = 0.05 ... 2.0, time to 100, continuous
-reference plotted to t = 20 where the Trotterizations still coincide).
+control parameter. This example reproduces the schematic and parameter
+set of Figure 6.4 of the author's doctoral thesis (see CITATION.cff) -
+tau = 0.05 ... 2.0, time to 100, continuous reference to t = 20 where the
+Trotterizations still coincide - at N = 1000 instead of the figure's
+N = 10^4.
 
 The curve is evaluated with a batched vector trick: forward chains F_n =
 U_F^n s are grown column by column and all backward chains U_F^†n (O F_n)

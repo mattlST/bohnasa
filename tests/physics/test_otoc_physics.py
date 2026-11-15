@@ -63,7 +63,7 @@ def test_classical_lambda_is_the_exact_reference_line():
 
 
 def test_lambda_s_attains_max_at_theta_star():
-    """Regression anchor (author's private master-thesis grid ~1.35): the
+    """Regression anchor (thesis grid ~1.35, see CITATION.cff): the
     exact maximum of lambda_s(theta) sits at theta* = 1.339 with value 0.4859."""
     thetas = np.linspace(1.1072, np.pi / 2 - 1e-3, 400)
     lams = np.array([mf.dimer_lambda(th) for th in thetas])

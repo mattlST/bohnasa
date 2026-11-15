@@ -30,6 +30,11 @@ growth and Krylov complexity after a quench.
   `momentum_distribution`, `pair_correlation` (bunching),
   `structure_factor` (`S(0) = 0` on the fixed-N shell, shot-noise `S(k) = 1`
   for the ideal condensate)
+- `SquaredCommutator` — OTOC scrambling growth ``C(t) = ‖[O(t), O]‖²`` by
+  the vector trick (state propagations only, never Liouville space; dense
+  or Krylov propagation, Floquet driving via `from_propagator`), with the
+  exact mean-field counterpart of the dimer (`dimer_lambda`,
+  `dimer_fixed_points`, `mean_field_flow`) as its classical reference line
 - runnable [examples](examples/README.md) covering all of the above
 
 ## Install

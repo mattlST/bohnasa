@@ -25,11 +25,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   fraction), `momentum_distribution`, `pair_correlation` (normal-ordered
   density noise, basis-diagonal by construction), `structure_factor`
   (issue #19).
+- OTOC scrambling: `SquaredCommutator` evaluates the squared commutator
+  ``C(t) = ||[O(t), O]|psi>||^2`` via the vector trick - state propagations
+  only, never Liouville-space assembly - with dense-eig and sparse-Krylov
+  paths and a Floquet entry point (`from_propagator`); the exact classical
+  half for the dimer (`dimer_fixed_points`, `dimer_jacobian`, `dimer_lambda`,
+  `mean_field_flow`) lives in a new module `classical_mean_field`, in the
+  quarter-circle convention J = cos(theta), U = 2 sin(theta)/N (issue #22).
 - Runnable examples `ex05_symmetry_sectors.py`, `ex06_momentum_spectra.py`,
-  `ex07_operator_growth.py` and `ex08_observables.py`
+  `ex07_operator_growth.py`, `ex08_observables.py`, `ex09_otoc.py` and
+  `ex10_kicked_dimer.py`
   (block reassembly, sector structure of a coherent quench, Krylov chain
   computed inside one sector, per-sector spectra vs analytic free bosons,
-  operator growth, state-resolved observables).
+  operator growth, state-resolved observables, OTOC Ehrenfest window,
+  Trotterized kicked dimer).
 - Security policy (`SECURITY.md`, private vulnerability reporting) and issue
   templates (bug report, feature request).
 - Coding rules (`CODING_RULES.md`), contribution process (`CONTRIBUTING.md`), changelog.

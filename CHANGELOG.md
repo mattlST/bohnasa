@@ -32,6 +32,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   half for the dimer (`dimer_fixed_points`, `dimer_jacobian`, `dimer_lambda`,
   `mean_field_flow`) lives in a new module `classical_mean_field`, in the
   quarter-circle convention J = cos(theta), U = 2 sin(theta)/N (issue #22).
+- Thermal (density-matrix) OTOC: `SquaredCommutator.thermal_curve(times, beta,
+  regularization)` evaluates ``C_beta(t) = Tr([O(t),O]^dag [O(t),O] rho_beta)``
+  for the Gibbs state ``rho_beta = exp(-beta H)/Z(beta)`` as a
+  Boltzmann-weighted spectral contraction over the energy eigenbasis (still
+  no Liouville assembly). `regularization="symmetric"` implements the
+  regularized convention of thesis Sec. 7.1 / App. D: the Gibbs weights enter
+  as symmetric `rho^{1/8}` insertions on both operator vertices, removing the
+  trivial identity/pure-state part (it vanishes at `beta -> infinity` while
+  the unregularized curve tends to the ground-state curve; both coincide at
+  `beta = 0`). Pinned by those limit invariants, the commuting-operator
+  invariance and brute-force `expm` density-matrix cross-checks on dimer and
+  trimer systems (issue #28).
 - Runnable examples `ex05_symmetry_sectors.py`, `ex06_momentum_spectra.py`,
   `ex07_operator_growth.py`, `ex08_observables.py`, `ex09_otoc.py` and
   `ex10_kicked_dimer.py`

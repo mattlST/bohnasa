@@ -1,6 +1,7 @@
 """State vectors in the fixed-N Fock basis."""
 
 import numpy as np
+from scipy.special import gammaln
 
 
 def multinomial(lst):
@@ -102,5 +103,17 @@ def fixed_n_coherent_state(fock, phi):
         raise ValueError(f"phi must have length {L} or {2 * L}, got {len(phi)}")
     phi = phi / np.linalg.norm(phi)
 
-    preCalMulti = np.array([(multinomial_sqrt(x)) for x in fock.fockArray])
-    return np.prod(phi[None, :] ** fock.fockArray, axis=1) * preCalMulti
+    # log-space construction: amplitudes are exp(0.5*(gammaln(N+1)
+    # - sum gammaln(n_i+1)) + sum n_i log|phi_i|), so the multinomial
+    # prefactor never materializes as a float and the builder stays
+    # finite for any N (direct sqrt(N!/prod n!) overflows around N ~ 3000)
+    occ = fock.fockArray.astype(float)
+    mag = np.abs(phi)
+    occupied_zero = np.any((occ > 0) & (mag[None, :] == 0.0), axis=1)
+    log_mag = np.where(mag > 0.0, np.log(np.where(mag > 0.0, mag, 1.0)), 0.0)
+    log_amp = 0.5 * (gammaln(fock.N + 1.0) - gammaln(occ + 1.0).sum(axis=1)) + occ @ log_mag
+    amp = np.exp(log_amp)
+    amp[occupied_zero] = 0.0
+    psi = amp * np.exp(1j * (occ @ np.angle(phi)))
+    norm = np.linalg.norm(psi)
+    return psi / norm if norm > 0.0 else psi

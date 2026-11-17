@@ -106,10 +106,12 @@ def test_l2_stability_spectrum_matches_dimer_jacobian(theta):
         s, phi = project_dimer(z)
         lab = np.sort(np.abs(np.linalg.eigvals(lat.stability_matrix(z))))
         red = np.sort(np.abs(np.linalg.eigvals(mf.dimer_jacobian(theta, s, phi))))
-        # rotating-frame pair = dimer pair (largest two), plus the
-        # phase-orbit zero pair (Jordan-split by <= 1e-7 here)
+        # rotating-frame pair = dimer pair (largest two, well-conditioned -> 1e-7),
+        # plus the phase-orbit zero pair: a 2x2 Jordan block whose spurious
+        # eigvals split at ~sqrt(eps) and are LAPACK-build dependent, so the
+        # band must sit well above that noise floor.
         assert lab[2:] == pytest.approx(red, abs=1e-7)
-        assert lab[:2].max() < 1e-7
+        assert lab[:2].max() < 1e-6
     # saddle exponent at the analytic value
     lam_lattice = max(
         np.linalg.eigvals(lat.stability_matrix(z)).real.max() for z in lat.fixed_points()

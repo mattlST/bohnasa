@@ -309,7 +309,7 @@ class MeanFieldLattice:
         >>> eigs = np.linalg.eigvals(lat.stability_matrix(saddle))
         >>> round(float(max(eigs.real)), 10) == round(dimer_lambda(1.35), 10)
         True
-        >>> float(np.sort(np.abs(eigs))[1]) < 1e-8   # the phase-orbit zero pair
+        >>> float(np.sort(np.abs(eigs))[1]) < 1e-6   # zero pair: Jordan-split ~sqrt(eps)
         True
         """
         z = self._state(z)

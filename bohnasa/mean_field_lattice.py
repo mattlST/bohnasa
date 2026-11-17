@@ -319,6 +319,20 @@ class MeanFieldLattice:
         rot[self._L :, : self._L] = np.eye(self._L)
         return self.jacobian(z) - gamma * rot
 
+    def _rhs(self, _t: float, y: np.ndarray) -> np.ndarray:
+        """``solve_ivp`` right-hand side ``f(t, z) = flow(z)``.
+
+        Bound method with an explicit signature rather than an inline lambda:
+        the older ``scipy-stubs`` the Python 3.10/3.11 CI arms resolve type
+        ``fun`` through strict overloads that cannot infer a bare lambda's
+        parameter types. The ``_t`` argument is unused (the flow is autonomous).
+        """
+        return self.flow(y)
+
+    def _jac(self, _t: float, y: np.ndarray) -> np.ndarray:
+        """``solve_ivp`` Jacobian callback ``J(t, z) = jacobian(z)`` (autonomous)."""
+        return self.jacobian(y)
+
     def trajectory(
         self,
         z0: Sequence[float] | np.ndarray,
@@ -372,9 +386,9 @@ class MeanFieldLattice:
         # ignore (and warn about) ``jac``, so only implicit ones get it.
         solver_options: dict[str, Any] = {"method": method}
         if method not in ("RK23", "RK45", "DOP853"):
-            solver_options["jac"] = lambda _t, y: self.jacobian(y)
+            solver_options["jac"] = self._jac
         sol = solve_ivp(
-            lambda _t, y: self.flow(y),
+            self._rhs,
             (float(times[0]), float(times[-1])),
             z0,
             t_eval=times,
@@ -469,7 +483,7 @@ class MeanFieldLattice:
         z = np.concatenate(([q0], q_rest, [0.0], p_rest))
         return z, float(y[-1])
 
-    def _fp_residual(self, y: np.ndarray) -> np.ndarray:
+    def _fp_residual(self, y: np.ndarray, *_args: object) -> np.ndarray:
         """Gauge-fixed fixed-point equations (2L - 1 residuals, internal).
 
         The convention is ``flow(z*) = gamma * g(z*)`` with phase-generator
@@ -487,9 +501,15 @@ class MeanFieldLattice:
         return res
 
     def _solve_fp(self, seed: np.ndarray, tol: float) -> tuple[np.ndarray, bool]:
-        sol = sopt.root(
-            self._fp_residual, seed, method="hybr", options={"xtol": 1e-13, "maxfev": 4000}
-        )
+        # ``method``/``options`` passed through an Any-typed mapping: the strict
+        # ``scipy-stubs`` overloads (resolved on the Python 3.10/3.11 CI arms)
+        # widen ``method=`` to str and can't tie an inline ``options`` dict to
+        # one branch of the options-union; the runtime call is unchanged.
+        root_options: dict[str, Any] = {
+            "method": "hybr",
+            "options": {"xtol": 1e-13, "maxfev": 4000},
+        }
+        sol = sopt.root(self._fp_residual, seed, **root_options)
         if not sol.success or float(np.linalg.norm(self._fp_residual(sol.x))) >= tol:
             return seed, False
         z, _ = self._unpack_fp(sol.x)

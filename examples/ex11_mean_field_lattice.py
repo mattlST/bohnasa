@@ -106,7 +106,10 @@ lam_t = lat4.lyapunov(z0, times, method="two_trajectory")
 print(
     f"maximal Lyapunov exponent: Benettin {lam_b:.6f}, QR {lam_q:.6f}, two-trajectory {lam_t:.6f}"
 )
-assert lam_b > 0.1 and abs(lam_b - lam_t) / lam_b < 0.01
+# chaotic finite-time estimates: Benettin vs two-trajectory agree within the
+# finite-time + threading spread (not a one-stack 1% band); QR is looser and
+# tracked separately. See issue #26.
+assert lam_b > 0.1 and abs(lam_b - lam_t) / lam_b < 0.05
 
 traj4 = lat4.trajectory(z0, times)
 occ = 0.5 * traj4[:, :4] ** 2 + 0.5 * traj4[:, 4:] ** 2

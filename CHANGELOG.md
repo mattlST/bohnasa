@@ -124,6 +124,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   (`operators.bond_pairs`); as a side effect `Hopping(connections=<ndarray>)`
   works instead of tripping the elementwise string comparison (pinned by a
   bit-equality regression test, issue #40).
+- `mean_field_flow` (`classical_mean_field`) integrates with
+  `scipy.integrate.solve_ivp` (adaptive DOP853, `rtol=1e-10`, `atol=1e-12`)
+  instead of a hand-rolled fixed-step RK4 loop; saddle anchor trajectories
+  agree with the replaced reference to 9.7e-9, and the ODE-perturbation-slope
+  physics anchor tightened from `abs=5e-3` to `abs=5e-4` (measured floor
+  3.34e-4, stable across the CI scipy matrix) (issue #24).
 - `hopping`, `correlator`, `correlator_m` share one transition-matrix builder with a
   unified row/output storage convention.
 - `time_evolution_exact_ind` returns complex results; imaginary parts of non-Hermitian
@@ -141,6 +147,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - Debug prints removed from `lanczos` and `time_evolution_exact_ind`.
 
 ### Removed
+- **Breaking (pre-1.0 API):** the `n_steps` parameter of `mean_field_flow`.
+  Rationale: the adaptive DOP853 has no step count to configure; the
+  parameter only ever controlled the fixed-step RK4 grid, and passing it is
+  now a `TypeError` (pinned by a regression test).
 - **Breaking (API freeze for 0.1.0):** legacy lowercase aliases
   (`fockStates_fixed_particle_number`, `operator`, `number`, `correlator`, `hopping`,
   `interaction`, `chemical_mu`, `coherent_state_number_projected`, `Krylov_complexity`),

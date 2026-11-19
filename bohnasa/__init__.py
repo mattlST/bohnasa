@@ -8,3 +8,4 @@ from .otoc import *
 from .sectors import *
 from .states import *
 from .time_evolution import *
+from .visualization import *

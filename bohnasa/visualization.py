@@ -31,18 +31,18 @@ Geometry.
 Bond energy and bond current.
     With ``gamma_ij = <c_i^dag c_j>`` from
     :func:`bohnasa.one_body_density_matrix`, the symmetric bond energy is
-    ``e_ij = 2 Re gamma_ij`` - invariant under ``i <-> j``, well defined on
-    the undirected edge, and equal to the kinetic-energy contribution of
-    that bond (in units of the hopping amplitude ``t = 1``): summed over
-    the ring bond list it reproduces ``<Hopping>`` exactly. The directed
-    bond current is ``j_ij = i (gamma_ji - gamma_ij) = 2 Im gamma_ij``;
+    ``e_ij = 2 Re gamma_ij`` - invariant under ``i <-> j``, well defined
+    on the undirected edge. Under the ring convention ``H = -t sum
+    (c_j^dag c_i + h.c.)`` (units ``t = 1``) the *kinetic*-energy
+    contribution of that bond is ``-e_ij``: summed over the bond list,
+    ``e`` reproduces ``<Hopping> = -<H_kin>`` exactly. The directed bond
+    current is ``j_ij = i (gamma_ji - gamma_ij) = 2 Im gamma_ij``;
     positive ``j_ij`` means particles flow from site ``i`` to site ``j``.
     The raw difference ``gamma_ji - gamma_ij`` of the original issue text
     is purely imaginary, so the factor ``i`` makes the encoded quantity
-    real. For the ring Hamiltonian ``H = -t sum (c_j^dag c_i + h.c.)``
-    over the same bond list, the continuity equation ``dn_i/dt =
-    sum_j (J_j->i - J_i->j)`` with ``J_i->j = t j_ij`` holds to machine
-    precision (derivation test).
+    real. For the ring Hamiltonian above over the same bond list, the
+    continuity equation ``dn_i/dt = sum_j (J_j->i - J_i->j)`` with
+    ``J_i->j = t j_ij`` holds to machine precision (derivation test).
 
 Visual grammar.
     Node circle *area* is linear in on-site occupation ``<n_i>``
@@ -50,18 +50,33 @@ Visual grammar.
     diverging ``coolwarm`` color) encodes the symmetric bond energy
     ``e_ij``: width ∝ ``|e|`` anchored at zero width for zero energy,
     color ∝ signed ``e`` under a trajectory-wide symmetric norm
-    ``±max|e|`` (so zero is always the map center). The edge DIRECTION is
-    an arrowhead along the bond pointing first -> second when ``j_ij > 0``
-    (flipped when negative), with head size ∝ ``|j|`` under the
-    trajectory-wide symmetric current norm ``max|j|``; currents below a
-    stated threshold (5% of ``max|j|`` by default) draw no arrowhead, and
-    the arrowhead color encodes nothing (size and direction carry the
-    full signed information, so no third colorbar is needed). ``edge_mode
-    = "coherence"`` replaces the base channel by ``|gamma_ij|`` on
+    ``±max|e|`` (so zero is always the map center). The edge DIRECTION
+    is an arrowhead over a shortened middle section of the bond,
+    pointing first -> second when ``j_ij > 0`` (flipped when negative),
+    with head size linear in ``|j|`` under the trajectory-wide current
+    norm ``max|j|``; currents at or below a stated threshold (5% of
+    ``max|j|`` by default) draw no arrowhead, and the arrowhead color
+    encodes nothing (size and direction carry the full signed
+    information, so no third colorbar is needed). ``edge_mode =
+    "coherence"`` replaces the base channel by ``|gamma_ij|`` on
     ``viridis`` while the arrows keep encoding the current. All
     normalizations are computed over the whole trajectory, never per
-    frame. Colormaps are colorblind-safe, and whenever color encodes a
-    quantity a colorbar is added.
+    frame; trajectory maxima below an absolute round-off floor (1e-14)
+    are noise, not signal, and render as minimum width, center color,
+    no arrows. Colormaps are colorblind-safe, and whenever color
+    encodes a quantity a colorbar is added - one shared pair at the
+    figure right in multi-panel views, never per-panel bars.
+
+Annotations.
+    Views may carry deterministic monospace text: a static
+    system-parameter ``header`` block (top-left, figure coordinates), a
+    static encoding ``legend`` below it (auto-generated from the
+    trajectory-wide normalization bounds actually used, or supplied),
+    and a live per-frame readout of caller-provided ``(T,)`` value
+    arrays with Python format specs (bottom-center). The visualization
+    computes no physics for the captions - it renders exactly the
+    numbers handed to it - and no wall-clock quantity enters any of
+    them.
 """
 
 from __future__ import annotations
@@ -89,6 +104,7 @@ __all__ = [
     "bond_coherence",
     "draw_lattice",
     "animate_lattice",
+    "add_captions",
     "occupation_heatmap",
     "momentum_heatmap",
 ]
@@ -96,9 +112,16 @@ __all__ = [
 _NODE_SIZE_RANGE = (4.0, 400.0)
 _EDGE_WIDTH_RANGE = (0.6, 4.6)
 _DOUBLON_SIZE_RANGE = (0.0, 150.0)
-_ARROW_SCALE_RANGE = (6.0, 24.0)
+_ARROW_SCALE_RANGE = (10.0, 40.0)
+_ARROW_SHAFT = (0.35, 0.65)
+_ARROW_LINEWIDTH = 2.0
 # arrowhead cutoff as a fraction of the trajectory-wide max |current|
 _ARROW_THRESHOLD = 0.05
+# absolute round-off noise floor: a trajectory maximum below this is numeric
+# noise, not signal; truthiness guards (`max or 1.0`) miss it because
+# float64 noise like 6.12e-17 is truthy and would self-normalize to full
+# widths, extreme colors and full-size arrows
+_NOISE_FLOOR = 1e-14
 
 _IMPORT_ERROR = (
     "bohnasa.visualization requires matplotlib, which is only needed by the "
@@ -143,11 +166,13 @@ def _scale_linear(
 ) -> np.ndarray:
     """Linear map ``[vmin, vmax] -> [out_min, out_max]`` with clipping.
 
-    A degenerate data range (``vmax == vmin``) maps to the midpoint of the
-    output range: constant data draws a constant, visible encoding.
+    A degenerate data range (``vmax - vmin`` below the round-off noise
+    floor) maps to the midpoint of the output range: constant data - or
+    pure numerical noise - draws a constant, visible encoding instead of
+    self-normalized extremes.
     """
     values = np.asarray(values, dtype=float)
-    if vmax == vmin:
+    if vmax - vmin < _NOISE_FLOOR:
         return np.full(values.shape, 0.5 * (out_min + out_max), dtype=float)
     scaled = out_min + (out_max - out_min) * (values - vmin) / (vmax - vmin)
     return np.clip(scaled, out_min, out_max)
@@ -158,6 +183,18 @@ def _widths_from_magnitude(values: np.ndarray, scale: float, width_range: tuple[
     return width_range[0] + (width_range[1] - width_range[0]) * np.clip(
         np.abs(values) / scale, 0.0, 1.0
     )
+
+
+def _guard_scale(max_abs: float) -> float:
+    """Round-off noise floor for a normalization scale (issue #40, B2).
+
+    Truthiness guards (``max or 1.0``) only catch an *exactly* zero maximum;
+    float64 cancellation noise like 6.12e-17 is truthy and would normalize
+    itself to full width / full arrow / colormap extreme. Treating any
+    maximum below ``_NOISE_FLOOR`` as degenerate (returns 1.0, so the true
+    values all map to ~zero: minimum encoding) makes noise render as noise.
+    """
+    return max_abs if max_abs >= _NOISE_FLOOR else 1.0
 
 
 def lattice_geometry(L: int, connections: str = "pbc") -> np.ndarray:
@@ -259,14 +296,14 @@ def lattice_bonds(
 def bond_energy(gamma: ArrayLike, bonds: ArrayLike) -> np.ndarray:
     r"""Symmetric bond energies ``e_ij = 2 Re gamma_ij = gamma_ij + gamma_ji``.
 
-    One real value per bond, in units of the hopping amplitude: the
-    kinetic-energy contribution of that bond to ``H = -t sum (c_j^dag c_i
-    + h.c.)`` (with ``t = 1`` the sum over the ring or chain bond list
-    equals ``<Hopping>`` - pinned in the tests). Being invariant under
-    ``i <-> j`` it is well defined on the undirected edge, so it carries
-    no orientation-dependent meaning and serves as the orientation-free
-    base channel (edge width and color) of the visual grammar; the
-    directed flow is carried separately by :func:`bond_current`.
+    One real value per bond, in units of the hopping amplitude: under
+    ``H = -t sum (c_j^dag c_i + h.c.)`` the *kinetic*-energy contribution
+    of that bond is ``-e_ij``, so summing ``e`` over the ring or chain
+    bond list reproduces ``<Hopping> = -<H_kin>`` exactly (pinned in the
+    tests). Being invariant under ``i <-> j`` it is well defined on the
+    undirected edge, hence the orientation-free base channel (edge width
+    and color) of the visual grammar; the directed flow is carried
+    separately by :func:`bond_current` (arrowheads).
 
     Parameters
     ----------
@@ -390,6 +427,8 @@ class _LatticeArtists:
         node_size_range: tuple[float, float] = _NODE_SIZE_RANGE,
         edge_width_range: tuple[float, float] = _EDGE_WIDTH_RANGE,
         arrow_scale_range: tuple[float, float] = _ARROW_SCALE_RANGE,
+        arrow_shaft: tuple[float, float] = _ARROW_SHAFT,
+        arrow_linewidth: float = _ARROW_LINEWIDTH,
         arrow_color: str = "0.15",
     ):
         # function-level import: this class only ever runs after _pyplot()
@@ -411,22 +450,23 @@ class _LatticeArtists:
             )[0]
             for i, j in bonds
         ]
-        # arrowheads span the middle 40% of the bond (30% -> 70%) so they
-        # never collide with the node circles; forward/backward position
-        # pairs are precomputed, per frame only the pair selection changes
+        # arrowheads span a shortened middle fraction of the bond (default
+        # 35% -> 65%) so they read as compact, prominent markers and never
+        # collide with the node circles; forward/backward position pairs are
+        # precomputed, per frame only the pair selection changes
         self.arrows = []
         self._arrow_endpoints = []
         for i, j in bonds:
             delta = xy[j] - xy[i]
-            tail = xy[i] + 0.30 * delta
-            head = xy[i] + 0.70 * delta
+            tail = xy[i] + arrow_shaft[0] * delta
+            head = xy[i] + arrow_shaft[1] * delta
             patch = ax.add_patch(
                 FancyArrowPatch(
                     tail,
                     head,
                     arrowstyle="-|>",
                     color=arrow_color,
-                    linewidth=1.2,
+                    linewidth=arrow_linewidth,
                     mutation_scale=arrow_scale_range[0],
                     zorder=2,
                 )
@@ -463,13 +503,16 @@ class _LatticeArtists:
         the no-arrow cutoff as a fraction of it; head size is linear in
         ``|j| / j_scale`` over ``arrow_scale_range`` and the arrow points
         first -> second for positive current (reversed endpoints otherwise).
+        Currents at or below the cutoff - and every bond when ``j_scale``
+        is round-off noise (below the module noise floor) - draw nothing.
         """
         lo, hi = self.arrow_scale_range
+        noisy = j_scale < _NOISE_FLOOR
         for patch, (forward, backward), value in zip(
             self.arrows, self._arrow_endpoints, currents, strict=True
         ):
             magnitude = abs(float(value))
-            if j_scale <= 0.0 or magnitude <= threshold * j_scale:
+            if noisy or magnitude <= threshold * j_scale:
                 patch.set_visible(False)
                 continue
             pos_a, pos_b = forward if value > 0.0 else backward
@@ -518,6 +561,137 @@ def _check_data_length(name: str, arr: ArrayLike, expected: int) -> None:
         raise ValueError(f"visualization: {name} must have {expected} entries, got {size}")
 
 
+def _as_lines(block: str | Sequence[str] | None) -> list[str]:
+    """Normalize a None / str / sequence-of-str text block to a line list."""
+    if block is None:
+        return []
+    if isinstance(block, str):
+        return [block]
+    return [str(line) for line in block]
+
+
+def _legend_lines(
+    node_bounds: tuple[float, float],
+    edge_mode: str,
+    edge_bounds: tuple[float, float] | None,
+    current_scale: float | None,
+    cutoff: float,
+    has_doublons: bool,
+) -> list[str]:
+    r"""Encoding-legend lines from the normalization bounds actually used.
+
+    ASCII grammar shorthand (these lines are figure captions, not mathtext
+    renderers): ``g`` is ``gamma_ij = <c_i^dag c_j>``, ``propto`` marks a
+    linear encoding. The bounds are the trajectory-wide values the view
+    normalizes by, so the legend states the norms of the rendered picture
+    rather than of the raw arrays; with no ``gamma`` the edge and arrow
+    clauses are omitted entirely.
+    """
+    squares = "   squares: doublons n_i(n_i-1)" if has_doublons else ""
+    if edge_bounds is not None and current_scale is not None:
+        lo, hi = edge_bounds
+        edge_desc = (
+            f"edge width+color propto 2Re g_ij ({lo:+.2f}..{hi:+.2f})"
+            if edge_mode == "energy"
+            else f"edge width+color propto |g_ij| [0, {hi:.2f}]"
+        )
+        return [
+            f"node area propto <n_i> in [{node_bounds[0]:.2f}, {node_bounds[1]:.2f}]   {edge_desc}",
+            f"arrows propto j_ij = 2Im g_ij (+-{current_scale:.2f})   "
+            f"no arrow |j| <= {cutoff:.3f}{squares}",
+        ]
+    return [f"node area propto <n_i> in [{node_bounds[0]:.2f}, {node_bounds[1]:.2f}]{squares}"]
+
+
+def _place_header(fig, header: str | Sequence[str] | None, legend: str | Sequence[str] | None):
+    """Place the static header/legend monospace block at the figure top-left.
+
+    Returns the list of ``Text`` artists created. Line spacing is computed
+    from the figure height and point size (deterministic in the inputs).
+    """
+    artists = []
+    height = float(fig.get_size_inches()[1])
+    y = 0.985
+    for block, size in ((header, 7.5), (legend, 7.0)):
+        lines = _as_lines(block)
+        if not lines:
+            continue
+        artists.append(
+            fig.text(0.015, y, "\n".join(lines), va="top", ha="left", family="monospace", size=size)
+        )
+        y -= (len(lines) * size / 72.0 / height) * 1.35 + 0.01
+    return artists
+
+
+def add_captions(
+    fig,
+    *,
+    header: str | Sequence[str] | None = None,
+    legend: str | Sequence[str] | None = None,
+) -> list:
+    """Draw static monospace captions (top-left) on a figure.
+
+    Companion of :func:`animate_lattice`'s ``header``/``legend`` parameters
+    for hand-built layouts such as the multi-panel frame strip: the header
+    states the system parameters, the legend the encoding norms actually
+    used. Captions are figure-level ``fig.text`` artists - deterministic,
+    monospace, and part of every rendered frame / saved page.
+
+    Parameters
+    ----------
+    fig : matplotlib.figure.Figure
+        Target figure.
+    header, legend : str or sequence of str, optional
+        Text block(s); the legend block is placed below the header.
+        Pass preformatted lines (see :func:`_legend_lines` usage in the
+        examples for the encoding shorthand).
+
+    Returns
+    -------
+    list of matplotlib.text.Text
+        The created text artists (header first, then legend).
+
+    Examples
+    --------
+    >>> import matplotlib.pyplot as plt
+    >>> fig = plt.figure()
+    >>> texts = add_captions(fig, header=["L=6 ring  U/t = 1.0"], legend=["node area propto n_i"])
+    >>> len(texts)
+    2
+    >>> texts[0].get_text()
+    'L=6 ring  U/t = 1.0'
+    >>> texts2 = add_captions(fig, header="one line", legend=["a", "b"])
+    >>> [len(t.get_text().splitlines()) for t in texts2]
+    [1, 2]
+    >>> plt.close(fig)
+    """
+    return _place_header(fig, header, legend)
+
+
+def _validate_live(live, n_time: int) -> list[tuple[str, np.ndarray, str]]:
+    """Coerce and check the live-readout fields to (label, (T,) values, spec)."""
+    fields: list[tuple[str, np.ndarray, str]] = []
+    for k, entry in enumerate(live):
+        label, values, spec = entry
+        arr = np.asarray(values, dtype=float)
+        if arr.ndim == 0:
+            arr = np.full(n_time, float(arr))
+        if arr.shape != (n_time,):
+            raise ValueError(
+                f"animate_lattice: live[{k}] ({label!r}) must have shape ({n_time},) "
+                f"= one value per frame, got {arr.shape}"
+            )
+        fields.append((str(label), arr, str(spec)))
+    return fields
+
+
+def _live_text(fields: list[tuple[str, np.ndarray, str]], k: int) -> str:
+    """Render frame k of the live readout: ``label = value`` monospace line."""
+    return "   ".join(
+        f"{label} = {format(float(values[k]), spec)}" for label, values, spec in fields
+    )
+
+
 def draw_lattice(
     ax: Axes,
     xy: ArrayLike,
@@ -533,6 +707,8 @@ def draw_lattice(
     node_vmax: float | None = None,
     edge_vmin: float | None = None,
     edge_vmax: float | None = None,
+    edge_scale: float | None = None,
+    current_scale: float | None = None,
     node_size_range: tuple[float, float] = _NODE_SIZE_RANGE,
     edge_width_range: tuple[float, float] = _EDGE_WIDTH_RANGE,
     node_cmap: str = "viridis",
@@ -541,7 +717,10 @@ def draw_lattice(
     edge_label: str = r"$e_{ij}$",
     arrow_threshold: float = _ARROW_THRESHOLD,
     arrow_scale_range: tuple[float, float] = _ARROW_SCALE_RANGE,
+    arrow_shaft: tuple[float, float] = _ARROW_SHAFT,
+    arrow_linewidth: float = _ARROW_LINEWIDTH,
     arrow_color: str = "0.15",
+    colorbar: bool = True,
 ) -> None:
     r"""Draw one static lattice snapshot on ``ax``.
 
@@ -595,6 +774,12 @@ def draw_lattice(
     node_vmin, node_vmax, edge_vmin, edge_vmax : float, optional
         Normalization bounds; node defaults are the data minima/maxima,
         edge defaults the symmetric ``±max|edge_colors|`` (see Warning).
+    edge_scale, current_scale : float, optional
+        Trajectory-wide maxima of the base value and of the current. When
+        given, edge widths, the symmetric edge-norm default and the
+        arrowhead size/cutoff normalize by these instead of the passed
+        arrays' own maxima - the way to replay one frame of a trajectory
+        with exactly the animation's scaling.
     node_size_range : (float, float), default (4.0, 400.0)
         Node area (points^2) at the minimum/maximum value.
     edge_width_range : (float, float), default (0.6, 4.6)
@@ -604,13 +789,24 @@ def draw_lattice(
     node_label, edge_label : str
         Colorbar labels for the node/edge colorbars.
     arrow_threshold : float, default 0.05
-        No-arrowhead cutoff, as a fraction of ``max|edge_currents|``.
-    arrow_scale_range : (float, float), default (6.0, 24.0)
+        No-arrowhead cutoff, as a fraction of ``max|edge_currents|`` (or
+        the absolute cutoff itself when ``max|edge_currents|`` is
+        round-off noise, which then draws nothing at all).
+    arrow_scale_range : (float, float), default (10.0, 40.0)
         Arrowhead ``mutation_scale`` (points) at threshold / at the
         maximum absolute current.
+    arrow_shaft : (float, float), default (0.35, 0.65)
+        Fractions of the bond the arrow spans (shortened middle section -
+        compact, prominent markers that clear the node circles).
+    arrow_linewidth : float, default 2.0
+        Arrow shaft line width in points.
     arrow_color : str, default "0.15"
         Arrowhead color; encodes no data (direction and size carry the
         current), hence no colorbar.
+    colorbar : bool, default True
+        Draw the node/edge colorbars on ``ax``'s figure. Set ``False``
+        for multi-panel strips that add ONE shared colorbar pair for the
+        whole figure (per-panel bars crowd the neighboring lattices).
 
     Returns
     -------
@@ -674,6 +870,8 @@ def draw_lattice(
         node_size_range=node_size_range,
         edge_width_range=edge_width_range,
         arrow_scale_range=arrow_scale_range,
+        arrow_shaft=arrow_shaft,
+        arrow_linewidth=arrow_linewidth,
         arrow_color=arrow_color,
     )
 
@@ -681,32 +879,40 @@ def draw_lattice(
         svmin = float(sizes_arr.min()) if node_vmin is None else float(node_vmin)
         svmax = float(sizes_arr.max()) if node_vmax is None else float(node_vmax)
         artists.set_frame(node_sizes=_scale_linear(sizes_arr, svmin, svmax, *node_size_range))
-    if node_colors is not None:
+    if node_colors is not None and colorbar:
         ax.figure.colorbar(artists.nodes, ax=ax, label=node_label, shrink=0.8, pad=0.02)
 
     edge_arr = None if edge_colors is None else np.asarray(edge_colors, dtype=float)
     if edge_arr is not None:
         if edge_vmin is None and edge_vmax is None:
             # signed diverging base channel defaults to a symmetric norm so
-            # zero (no bond energy) is exactly the colormap center
-            amax = float(np.max(np.abs(edge_arr))) or 1.0
+            # zero (no bond energy) is exactly the colormap center; an
+            # explicit trajectory-wide edge_scale pins that norm across panels
+            amax = _guard_scale(
+                float(np.max(np.abs(edge_arr))) if edge_scale is None else float(edge_scale)
+            )
             vmin, vmax = -amax, amax
         else:
             vmin = float(edge_arr.min()) if edge_vmin is None else float(edge_vmin)
             vmax = float(edge_arr.max()) if edge_vmax is None else float(edge_vmax)
         artists.edge_norm = plt.Normalize(vmin=vmin, vmax=vmax)
-        mappable = plt.cm.ScalarMappable(norm=artists.edge_norm, cmap=plt.get_cmap(edge_cmap))
-        mappable.set_array([])
-        ax.figure.colorbar(mappable, ax=ax, label=edge_label, shrink=0.8, pad=0.02)
+        if colorbar:
+            mappable = plt.cm.ScalarMappable(norm=artists.edge_norm, cmap=plt.get_cmap(edge_cmap))
+            mappable.set_array([])
+            ax.figure.colorbar(mappable, ax=ax, label=edge_label, shrink=0.8, pad=0.02)
     if edge_widths is not None:
         width_arr = np.asarray(edge_widths, dtype=float)
-        scale = float(np.max(np.abs(width_arr))) or 1.0
+        raw = float(np.max(np.abs(width_arr))) if edge_scale is None else float(edge_scale)
+        scale = _guard_scale(raw)
         artists.set_frame(edge_widths=_widths_from_magnitude(width_arr, scale, edge_width_range))
     if edge_arr is not None:
         artists.set_frame(edge_colors=edge_arr)
     if edge_currents is not None:
         current_arr = np.asarray(edge_currents, dtype=float)
-        artists.set_arrows(current_arr, float(np.max(np.abs(current_arr))), arrow_threshold)
+        raw_j = (
+            float(np.max(np.abs(current_arr))) if current_scale is None else float(current_scale)
+        )
+        artists.set_arrows(current_arr, raw_j, arrow_threshold)
 
 
 def animate_lattice(
@@ -723,7 +929,12 @@ def animate_lattice(
     edge_cmap: str | None = None,
     arrow_threshold: float = _ARROW_THRESHOLD,
     arrow_scale_range: tuple[float, float] = _ARROW_SCALE_RANGE,
+    arrow_shaft: tuple[float, float] = _ARROW_SHAFT,
+    arrow_linewidth: float = _ARROW_LINEWIDTH,
     arrow_color: str = "0.15",
+    header: str | Sequence[str] | None = None,
+    legend: str | Sequence[str] | bool | None = None,
+    live: Sequence[tuple[str, ArrayLike, str]] | None = None,
     interval: float = 50,
     ax: Axes | None = None,
 ) -> FuncAnimation:
@@ -780,17 +991,47 @@ def animate_lattice(
         ``"energy"`` and ``"viridis"`` for ``"coherence"``.
     arrow_threshold : float, default 0.05
         No-arrowhead cutoff as a fraction of the trajectory-wide max
-        ``|current|`` (the stated zero-current threshold of the grammar).
-    arrow_scale_range : (float, float), default (6.0, 24.0)
+        ``|current|`` (the stated zero-current threshold of the grammar);
+        a trajectory whose max ``|current|`` is round-off noise (below
+        ``1e-14``) draws no arrows at all.
+    arrow_scale_range : (float, float), default (10.0, 40.0)
         Arrowhead ``mutation_scale`` (points) at the threshold and at the
         trajectory-wide max ``|current|``.
+    arrow_shaft : (float, float), default (0.35, 0.65)
+        Fractions of the bond the arrow spans (shortened middle section).
+    arrow_linewidth : float, default 2.0
+        Arrow shaft line width in points.
     arrow_color : str, default "0.15"
         Arrowhead color; encodes no data, so it adds no colorbar.
+    header : str or sequence of str, optional
+        Static system-parameter text block, monospace, top-left over the
+        axes (figure coordinates). ``None`` draws nothing.
+    legend : str, sequence of str, True, or None, default None
+        Static encoding legend below the header. ``True`` auto-generates
+        the lines from the trajectory-wide normalization bounds actually
+        used by this view (node range, edge norms, current norm, arrow
+        cutoff); a string/sequence is drawn verbatim; ``None``/False draws
+        nothing.
+    live : sequence of (label, values, format-spec), optional
+        Per-frame readout line, bottom-center, monospace. ``values`` is a
+        precomputed ``(T,)`` array (one value per frame; a scalar fills
+        all frames) and ``format-spec`` a Python format spec applied to
+        ``float(values[k])`` - e.g. ``("t", times, "5.2f")`` or
+        ``("<H_hop>", hop_means, "+.3f")``. The view never computes
+        physics: the caller supplies every number to be displayed.
     interval : float, default 50
         Milliseconds between frames in a live replay - a nominal
         parameter, not a measured time; saving derives its fps from it.
     ax : matplotlib.axes.Axes, optional
         Target axes; a new figure is created when omitted.
+
+    Notes
+    -----
+    Text blocks (header/legend/live) are deterministic figure artists:
+    they participate in every rendered frame and in saved files, and the
+    live readout changes only with the frame index - never with wall
+    clock. Adding any of them reserves figure margins via
+    ``fig.subplots_adjust``.
 
     Returns
     -------
@@ -860,17 +1101,19 @@ def animate_lattice(
         dbl = None
 
     node_vmin, node_vmax = float(occ.min()), float(occ.max())
-    base_scale = 0.0
+    base_raw_max = 0.0
     if base_series is not None and base_series.size:
-        base_scale = (
+        base_raw_max = (
             float(np.max(base_series))
             if edge_mode == "coherence"
             else float(np.max(np.abs(base_series)))
         )
-    if base_scale <= 0.0:
-        base_scale = 1.0  # all-zero base: finite normalization, center color, min width
+    # round-off noise below the floor must not self-normalize: the guarded
+    # scale renders noise as minimum width / center color
+    base_scale = _guard_scale(base_raw_max)
     base_vmin = 0.0 if edge_mode == "coherence" else -base_scale
-    # trajectory-wide symmetric current norm for the arrows (0 allowed: all hidden)
+    # raw trajectory-wide current norm: set_arrows hides everything below
+    # the noise floor; the legend states the true (unguarded) norm
     current_scale = 0.0 if current_series is None else float(np.max(np.abs(current_series)))
 
     cmap_nodes = plt.get_cmap(node_cmap)
@@ -897,6 +1140,8 @@ def animate_lattice(
         node_size_range=node_size_range,
         edge_width_range=edge_width_range,
         arrow_scale_range=arrow_scale_range,
+        arrow_shaft=arrow_shaft,
+        arrow_linewidth=arrow_linewidth,
         arrow_color=arrow_color,
     )
     fig.colorbar(artists.nodes, ax=ax, label=r"$\langle \hat{n}_i \rangle$", shrink=0.8, pad=0.02)
@@ -906,12 +1151,35 @@ def animate_lattice(
         label = r"$e_{ij}$" if edge_mode == "energy" else r"$|\gamma_{ij}|$"
         fig.colorbar(mappable, ax=ax, label=label, shrink=0.8, pad=0.02)
     dbl_max = 0.0 if dbl is None else float(dbl.max())
-    dbl_scale = dbl_max if dbl_max > 0.0 else 1.0  # trajectory-wide, zero-safe
+    dbl_scale = _guard_scale(dbl_max)  # trajectory-wide, noise-floor-safe
 
     def doublon_areas(values: np.ndarray) -> np.ndarray:
         return _scale_linear(values, 0.0, dbl_scale, *_DOUBLON_SIZE_RANGE)
 
     doublon_layer = None if dbl is None else artists.add_doublons(doublon_areas(dbl[0]))
+
+    # --- annotation blocks (issue #40 round 3) -----------------------------
+    legend_block: str | Sequence[str] | None
+    if legend is True or legend == "auto":
+        legend_block = _legend_lines(
+            (node_vmin, node_vmax),
+            edge_mode,
+            None if base_series is None else (base_vmin, base_scale),
+            None if current_series is None else current_scale,
+            arrow_threshold * current_scale,
+            dbl is not None,
+        )
+    elif legend is False:
+        legend_block = None
+    else:
+        legend_block = legend
+    caption_artists = _place_header(fig, header, legend_block)
+    live_fields = _validate_live(live, n_time) if live is not None else []
+    if caption_artists or live_fields:
+        fig.subplots_adjust(top=0.80, bottom=0.10 if live_fields else 0.04, left=0.02, right=0.97)
+    live_text = None
+    if live_fields:
+        live_text = fig.text(0.5, 0.045, "", ha="center", family="monospace", size=8.0)
     title = ax.set_title("")
 
     def frame(k: int) -> Iterable[Artist]:
@@ -935,9 +1203,14 @@ def animate_lattice(
         if current_series is not None:
             artists.set_arrows(current_series[k], current_scale, arrow_threshold)
         title.set_text(f"t = {times[k]:g}")
+        if live_text is not None:
+            live_text.set_text(_live_text(live_fields, k))
         updated: list[Artist] = [artists.nodes, title, *artists.lines, *artists.arrows]
         if doublon_layer is not None:
             updated.append(doublon_layer)
+        updated.extend(caption_artists)
+        if live_text is not None:
+            updated.append(live_text)
         return updated
 
     frame(0)

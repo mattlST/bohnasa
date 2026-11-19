@@ -23,10 +23,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   trajectory max |j| by default) - pinned by a continuity-equation
   derivation test. Coherence `|gamma_ij|` remains available as an
   alternative edge mode (`edge_mode="coherence"`); optional doublon
-  overlay from `pair_correlation`. All normalizations trajectory-wide,
-  colormaps colorblind-safe, colorbars accompany any color-encoded data,
-  and matplotlib is imported lazily (`examples` extra; runtime floor stays
-  numpy + scipy). Illustrated by `examples/ex12_lattice_visualization.py`,
+  overlay from `pair_correlation`. All normalizations trajectory-wide
+  with an absolute round-off noise floor (1e-14) so cancellation noise
+  cannot self-normalize to extremes, colormaps colorblind-safe, colorbars
+  accompanying any color-encoded data - one shared pair per figure in
+  multi-panel views (`draw_lattice(colorbar=False)` plus
+  `draw_lattice(edge_scale=..., current_scale=...)` to replay a frame
+  with exactly the animation's norms). Deterministic annotated captions:
+  static monospace `header` and auto/`legend` blocks plus a live
+  per-frame readout of caller-supplied `(T,)` value arrays
+  (`live=[("t", times, "5.2f"), ...]`); `add_captions` places the static
+  blocks on hand-built figures, and the arrowheads were made more
+  prominent (`(10, 40)` pt head ramp over a shortened `0.35-0.65` shaft,
+  linewidth 2.0). matplotlib is imported lazily (`examples` extra;
+  runtime floor stays numpy + scipy). Illustrated by
+  `examples/ex12_lattice_visualization.py`,
   a current-carrying Gaussian-packet quench (the parity-symmetric Fock
   k=0 protocol of the first revision has vanishing current and would
   render no arrows).

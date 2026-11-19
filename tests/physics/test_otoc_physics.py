@@ -63,7 +63,15 @@ def test_classical_lambda_is_the_exact_reference_line():
     delta = traj - np.array([0.0, np.pi])
     logdelta = 0.5 * np.log(delta[:, 0] ** 2 + delta[:, 1] ** 2)
     m = (times > 0.5) & (times < 3.0)
-    assert np.polyfit(times[m], logdelta[m], 1)[0] == pytest.approx(lam, abs=5e-3)
+    # Observed slope deviation from the DOP853 (rtol=1e-10/atol=1e-12) flow
+    # at the 1e-9-amplitude anchor: 3.3387e-04, bit-identical on scipy
+    # 1.15.3/1.16.3/1.18.1 (py3.10-3.14); +-1 ulp libm jitter of the
+    # right-hand side moves it by < 1e-7. The floor is
+    # the chaotic amplification of tolerance-scale solver noise at the tiny
+    # perturbation amplitude, not integrator order; tightening the band
+    # further would track tolerances, not physics (issue #24 replaced the
+    # fixed-step RK4, whose deviation here was 2.1875e-04).
+    assert np.polyfit(times[m], logdelta[m], 1)[0] == pytest.approx(lam, abs=5e-4)
 
 
 def test_lambda_s_attains_max_at_theta_star():

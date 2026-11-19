@@ -17,7 +17,7 @@ question, ends with self-check assertions, and is smoke-tested headless in CI
 | `ex09_otoc.py` | squared-commutator scrambling growth and its Ehrenfest window across particle numbers |
 | `ex10_kicked_dimer.py` | Trotterized dimer driving: small periods regain the continuous curve, larger ones weaken the growth rate |
 | `ex11_mean_field_lattice.py` | general L-site mean-field DNLS engine: exact L=2 dimer reduction, L=4 fixed-point branches, three-way Lyapunov cross-check |
-| `ex12_lattice_visualization.py` | the geometric view: L=6 ring quench of a winding Gaussian packet — pulsing node sizes, bond-energy-colored edges with current arrowheads (headless GIF + frame strip, byte-deterministic), occupation/momentum heatmaps |
+| `ex12_lattice_visualization.py` | the geometric view: L=6 ring quench of a current-carrying winding Gaussian packet — pulsing node sizes, bond-energy-colored edges with prominent current arrowheads, header/legend/live captions, one shared colorbar pair (headless GIF + frame strip, byte-deterministic), occupation/momentum heatmaps |
 
 Run:
 

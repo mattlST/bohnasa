@@ -4,21 +4,25 @@ Question: can the lattice view of issue #40 (amended grammar) turn the
 numeric tables of the observables module into a picture that is
 simultaneously (a) faithful - the drawn bonds are literally the
 Hamiltonian's bond list, the edge base encodes the symmetric bond energy
-``e_ij = 2 Re gamma_ij`` whose bond sum equals ``<Hopping>`` exactly, and
-the arrowheads encode the current ``j_ij = 2 Im gamma_ij`` pinned by the
-continuity equation - and (b) reproducible: the saved GIF and PNG frame
-strip are byte-identical across repeated builds?
+``e_ij = 2 Re gamma_ij`` whose bond sum equals ``<Hopping>`` (= -<H_kin>)
+exactly, and the arrowheads encode the current ``j_ij = 2 Im gamma_ij``
+pinned by the continuity equation - and (b) reproducible: the annotated
+GIF and PNG frame strip are byte-identical across repeated builds?
 
 Protocol: N = 6 bosons on an L = 6 ring, starting as a Gaussian packet
-(occupation widths sigma = 1.5 sites around site 0) with winding k0 =
-2 pi / 6 - a CURRENT-CARRYING quench: the parity-symmetric density-only
-initial states (Fock |6,0,...> or the k = 0 plane wave) have gamma real
-and hence j_ij = 0 everywhere, which would leave the arrow channel empty.
-The packet circulates with group velocity 2 t sin(k0) while spreading
-under U = 1 (``Interaction * 0.5`` in the module's unit convention,
-t = 1). Node area pulses with ``<n_i>``, edges shade with the bond
-energy, arrowheads show the current, squares track doublons. Exact
-diagonalization propagates the state (dim = 462, all headless).
+(width sigma = 1.5 sites around site 0) with winding k0 = 2 pi / 6 - a
+CURRENT-CARRYING quench: parity-symmetric density-only initial states
+(Fock |6,0,...> or the k = 0 plane wave) have gamma real and hence
+j_ij = 0 everywhere, which would leave the arrow channel empty. Under
+H = -t sum(c^dag_j c_i + h.c.) + (U/2) sum n_i(n_i-1) with t = 1, U = 1
+(``Interaction * 0.5`` in the module's unit convention) the packet
+circulates: its measured bond-flux velocity at t = 0 is 1.6590 sites/s,
+below the monochromatic group velocity 2 t sin(k0) = 1.7321 sites/s
+(the finite momentum spread of sigma = 1.5 shifts weight toward smaller
+|sin k|), and it spreads as it goes. Nodes pulse with ``<n_i>``, edges
+shade with the bond energy, arrowheads show the current, squares track
+doublons; the header/legend/caption blocks state the norms actually used.
+Exact diagonalization propagates the state (dim = 462, all headless).
 """
 
 import hashlib
@@ -40,7 +44,12 @@ from bohnasa import (
     one_body_density_matrix,
     time_evolution_exact_ind,
 )
-from bohnasa.visualization import (
+from bohnasa.visualization import (  # _ARROW_THRESHOLD / _legend_lines are
+    # module-private on purpose: the printed cutoff and the legend wording must
+    # come from the exact constants/formatter the renderer uses (#40 round-3 B7)
+    _ARROW_THRESHOLD,
+    _legend_lines,
+    add_captions,
     animate_lattice,
     bond_current,
     bond_energy,
@@ -62,16 +71,17 @@ H = hop * (-1.0) + Interaction(fock) * U_HALF
 # Gaussian packet with winding k0 = 2 pi / 6 (wrapped distance from site 0)
 k0 = 2.0 * np.pi / L
 dj = np.minimum(np.arange(L), L - np.arange(L))
-phi0 = np.exp(-(dj**2) / (4.0 * 1.5**2) + 1j * k0 * np.arange(L))
+SIGMA = 1.5
+phi0 = np.exp(-(dj**2) / (4.0 * SIGMA**2) + 1j * k0 * np.arange(L))
 psi0 = fixed_n_coherent_state(fock, phi0)
 times = np.linspace(0.0, 6.0, N_TIME)
 
-# Observables measured inside one time_evolution_exact_ind call:
-# per-site Number, the L^2 Correlators (Correlator(fock, j, i) = c^dag_i c_j
-# is gamma_ij), doublon operators n_i(n_i-1) as bare diagonal Operators,
-# the momentum-mode operators a^dag_k a_k assembled from Correlators with
-# the convention a_k = L^(-1/2) sum_j exp(-i k j) c_j of
-# momentum_distribution, and the bare Hopping (the bond-energy sum rule).
+# Observables measured inside one time_evolution_exact_ind call: per-site
+# Number, the L^2 Correlators (Correlator(fock, j, i) = c^dag_i c_j is
+# gamma_ij), doublon operators n_i(n_i-1) as bare diagonal Operators, the
+# momentum-mode operators a^dag_k a_k assembled from Correlators with the
+# convention a_k = L^(-1/2) sum_j exp(-i k j) c_j of momentum_distribution,
+# and the bare Hopping (the bond-energy sum rule).
 number_ops = [Number(fock, i) for i in range(L)]
 correlator_ops = [Correlator(fock, j, i) for i in range(L) for j in range(L)]
 doublon_ops = []
@@ -85,7 +95,7 @@ for mode in range(L):
     k = 2.0 * np.pi * mode / L
     mat = sp.csr_matrix((fock.dim, fock.dim), dtype=complex)
     # a^dag_k a_k = (1/L) sum_ij exp(i k (i - j)) c^dag_i c_j for
-    # a_k = L^(-1/2) sum_j exp(-i k j) c_j  (the momentum_distribution convention)
+    # a_k = L^(-1/2) sum_j exp(-i k j) c_j (the momentum_distribution convention)
     for i in range(L):
         for j in range(L):
             mat = mat + np.exp(1j * k * (i - j)) / L * Correlator(fock, j, i).matrix
@@ -125,31 +135,65 @@ j_t = np.array([bond_current(g, bonds) for g in gamma_t])
 e_t = np.array([bond_energy(g, bonds) for g in gamma_t])
 assert j_t.dtype == float and e_t.dtype == float
 
-# the bond-energy sum rule: sum of e_ij over the bond list is <Hopping>
+# bond-energy sum rule: sum of e_ij over the bond list is <Hopping>(t) =
+# -<H_kin>(t); the energy channels then conserve H = H_hop + H_int.
 sum_rule_dev = float(np.abs(e_t.sum(axis=1) - hop_t).max())
 assert sum_rule_dev < 1e-10, sum_rule_dev
+h_hop_t = -hop_t  # <H_hop> = <-t Hopping> with t = 1
+h_int_t = U_HALF * dbl_t.sum(axis=1)  # <(U/2) sum n(n-1)>
+e_dev = float(np.abs(h_hop_t + h_int_t - (h_hop_t[0] + h_int_t[0])).max())
+assert e_dev < 1e-9, e_dev
 
 # the quench carries current: measured over this protocol the trajectory
-# max |j| is 2.6848..., well above the 5%-of-max no-arrow threshold
+# max |j| is 2.6848..., far above the 5%-of-max no-arrow cutoff 0.1342...
 j_max = float(np.abs(j_t).max())
+cutoff = _ARROW_THRESHOLD * j_max
 assert j_max > 2.5, j_max
-arrows_visible = (np.abs(j_t) > 0.05 * j_max).sum(axis=1)
-assert np.all(arrows_visible >= 1)  # every frame shows at least one arrowhead
-e_max = float(np.abs(e_t).max())
+arrows_visible = np.abs(j_t) > cutoff
+assert np.all(arrows_visible.sum(axis=1) >= 1)  # every frame shows >= 1 arrow
+# packet flux velocity at t = 0 (mean bond current / site density, sites/s):
+# 1.6590 measured, vs the monochromatic 2 t sin(k0) = 1.7321 it approximates.
+v0 = float(L * j_t[0].mean() / N)
+v_mono = 2.0 * 1.0 * np.sin(k0)
+assert 1.5 < abs(v0) < v_mono, (v0, v_mono)
 mid = N_TIME // 2
 assert np.abs(np.real(np.diag(gamma_t[mid])) - n_i_t[mid]).max() < 1e-10
+# the momentum-operator means equal the FFT of the measured gamma (same
+# convention, independent code paths): n_k = sum_ij conj(E_ki) gamma_ij E_kj
 k_vec = 2.0 * np.pi * np.arange(L) / L
 phase = np.exp(-1j * np.outer(k_vec, np.arange(L))) / np.sqrt(L)
 n_k_from_gamma = np.einsum("ki,tij,kj->tk", phase.conj(), gamma_t, phase).real
 assert np.abs(n_k_from_gamma - n_k_t).max() < 1e-9
-print(f"number conservation: max deviation {norm_dev:.1e}")
+e_max = float(np.abs(e_t).max())
+print(f"number conservation: max deviation {norm_dev:.1e}; energy: {e_dev:.1e}")
 print(f"bond energy |e|max = {e_max:.4f}; sum-rule vs <Hopping> err {sum_rule_dev:.1e}")
-n_arrows = int((arrows_visible > 0).sum())
-print(f"bond current |j|max = {j_max:.4f}; arrows visible in {n_arrows}/{N_TIME} frames")
+print(
+    f"bond current |j|max = {j_max:.4f}; cutoff {cutoff:.4f}; arrows in "
+    f"{int(arrows_visible.any(axis=1).sum())}/{N_TIME} frames"
+)
+print(f"packet flux velocity at t=0: {abs(v0):.4f} sites/s (monochromatic {v_mono:.4f})")
 
 # --- trajectory-wide normalization (never per frame) ----------------------
 node_bounds = (float(n_i_t.min()), float(n_i_t.max()))
 edge_bounds = (-e_max, e_max)  # symmetric: zero bond energy is the color center
+
+# annotation blocks (all deterministic: simulated data only, no wall clock)
+header_lines = [
+    f"Bose-Hubbard ring   L={L}  N={N}  nu=N/L={N / L:.1f}  pbc",
+    f"t_hop = 1.0   U/t = {2 * U_HALF:.1f}   init: Gaussian packet k0=2pi/6 sigma={SIGMA:.1f}",
+    f"evolution: t in [0, {times[-1]:g}], {N_TIME} frames   "
+    f"arrow cutoff: {_ARROW_THRESHOLD:.0%} of max|j| = {cutoff:.3f}",
+]
+legend_lines_gif = _legend_lines(node_bounds, "energy", edge_bounds, j_max, cutoff, True)
+# the strip has no doublon layer, so its legend must not claim one
+legend_lines_strip = _legend_lines(node_bounds, "energy", edge_bounds, j_max, cutoff, False)
+live_fields = [
+    ("t", times, "5.2f"),
+    ("<H_hop>", h_hop_t, "+.3f"),
+    ("<H_int>", h_int_t, "+.3f"),
+    ("max|j|", np.abs(j_t).max(axis=1), ".3f"),
+    ("sum n_i - N", n_i_t.sum(axis=1) - N, "+.1e"),
+]
 
 out_dir = Path(__file__).resolve().parent
 xy = lattice_geometry(L, "pbc")
@@ -157,8 +201,9 @@ strip_frames = [0, 10, 20, 29, 38, 48]
 
 
 def build_strip(path: Path) -> str:
-    """Render the six-frame strip with the pinned trajectory bounds."""
-    fig, axes = plt.subplots(1, len(strip_frames), figsize=(3.0 * len(strip_frames), 3.4))
+    """Six-frame strip: panels without own colorbars, ONE shared pair at
+    the figure right, plus the same header/legend captions as the GIF."""
+    fig, axes = plt.subplots(1, len(strip_frames), figsize=(2.9 * len(strip_frames) + 1.8, 4.4))
     for ax, frame in zip(axes, strip_frames, strict=True):
         draw_lattice(
             ax,
@@ -170,13 +215,25 @@ def build_strip(path: Path) -> str:
             edge_currents=j_t[frame],
             node_vmin=node_bounds[0],
             node_vmax=node_bounds[1],
-            edge_vmin=edge_bounds[0],
-            edge_vmax=edge_bounds[1],
-            node_label="",
-            edge_label="",
+            edge_scale=e_max,
+            current_scale=j_max,
+            colorbar=False,  # the shared pair is added once for the figure
         )
-        ax.set_title(f"t = {times[frame]:g}")
-    fig.tight_layout()
+        ax.set_title(f"t = {times[frame]:g}", family="monospace", size=9)
+    add_captions(fig, header=header_lines, legend=legend_lines_strip)
+    # reserve the header/legend space at the top; the colorbar calls shrink
+    # the panel row themselves (setting right= here would re-open the
+    # panels into the colorbar axes and overlap them)
+    fig.subplots_adjust(top=0.80, bottom=0.04, left=0.01)
+    node_bar = plt.cm.ScalarMappable(cmap="viridis", norm=plt.Normalize(*node_bounds))
+    node_bar.set_array([])
+    edge_bar = plt.cm.ScalarMappable(cmap="coolwarm", norm=plt.Normalize(*edge_bounds))
+    edge_bar.set_array([])
+    # ONE shared colorbar pair placed once at the figure right (round-3 A3a):
+    # the node call first reserves the far-right slot, the edge call is then
+    # inserted to its left, giving the approved edge-then-node reading order
+    fig.colorbar(node_bar, ax=list(axes), label=r"$\langle \hat{n}_i \rangle$", shrink=0.8)
+    fig.colorbar(edge_bar, ax=list(axes), label=r"$e_{ij}=2\mathrm{Re}\,\gamma_{ij}$", shrink=0.8)
     fig.savefig(path, dpi=80)
     plt.close(fig)
     return hashlib.sha256(path.read_bytes()).hexdigest()
@@ -190,9 +247,18 @@ assert hash_first == hash_second, "frame strip is not deterministic"
 
 
 def build_gif(path: Path) -> str:
-    """Render the replay once and save it headless."""
-    ax = plt.subplots(figsize=(5.2, 4.4), dpi=80)[1]
-    anim = animate_lattice(times, n_i_t, gamma_t, doublons=dbl_t, ax=ax)
+    """Render the annotated replay once and save it headless."""
+    ax = plt.subplots(figsize=(6.4, 5.4), dpi=80)[1]
+    anim = animate_lattice(
+        times,
+        n_i_t,
+        gamma_t,
+        doublons=dbl_t,
+        header=header_lines,
+        legend=legend_lines_gif,
+        live=live_fields,
+        ax=ax,
+    )
     anim.save(path, writer="pillow", fps=12)
     plt.close("all")  # saving marks the animation as rendered
     return hashlib.sha256(path.read_bytes()).hexdigest()
@@ -223,5 +289,5 @@ assert np.abs(n_k_t.sum(axis=1) - N).max() < 1e-9  # sum_k n_k = N
 
 print(
     "issue #40 checks passed: bond list shared with Hopping, e-sum rule, "
-    "arrows drawn, strip and GIF byte-identical"
+    "annotated arrows drawn, strip and GIF byte-identical"
 )

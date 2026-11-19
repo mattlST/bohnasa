@@ -12,16 +12,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   with `Hopping` (`operators.bond_pairs`, including the deliberate `L = 2` PBC
   double counting), static snapshots (`draw_lattice`), headless deterministic
   trajectory replays (`animate_lattice`) and 2-D fallback views
-  (`occupation_heatmap`, `momentum_heatmap`). Visual grammar: node circle area
-  linear in on-site occupation, edges encoding the bond current
-  `j_ij = i (gamma_ji - gamma_ij) = 2 Im gamma_ij` (width in `|j|`, diverging
-  `coolwarm` color; coherence `|gamma_ij|` as alternative mode; optional
-  doublon overlay from `pair_correlation`), with all normalizations
-  trajectory-wide. Colormaps are colorblind-safe, colorbars accompany any
-  color-encoded data, and matplotlib is imported lazily (`examples` extra;
-  runtime floor stays numpy + scipy). Pinned by a continuity-equation
-  derivation test and the `Hopping` bond-list identity, illustrated by
-  `examples/ex12_lattice_visualization.py` (issue #40).
+  (`occupation_heatmap`, `momentum_heatmap`). Visual grammar (issue #40,
+  amended): node circle area linear in on-site occupation; the edge base
+  (width ∝ |e|, diverging `coolwarm` color, symmetric trajectory-wide norm
+  so zero is neutral) encodes the symmetric bond energy
+  `e_ij = 2 Re gamma_ij`, whose sum over the bond list is exactly
+  `<Hopping>` (sum-rule test); arrowheads encode the directed bond current
+  `j_ij = 2 Im gamma_ij` - pointing first -> second for positive current,
+  head size ∝ |j|, hidden at or below a stated threshold (5% of the
+  trajectory max |j| by default) - pinned by a continuity-equation
+  derivation test. Coherence `|gamma_ij|` remains available as an
+  alternative edge mode (`edge_mode="coherence"`); optional doublon
+  overlay from `pair_correlation`. All normalizations trajectory-wide,
+  colormaps colorblind-safe, colorbars accompany any color-encoded data,
+  and matplotlib is imported lazily (`examples` extra; runtime floor stays
+  numpy + scipy). Illustrated by `examples/ex12_lattice_visualization.py`,
+  a current-carrying Gaussian-packet quench (the parity-symmetric Fock
+  k=0 protocol of the first revision has vanishing current and would
+  render no arrows).
 - Generic one-/two-body Hamiltonian builder (`Hamiltonian`): normal-ordered
   `Σ t_ij c†_i c_j + Σ V_ijkl c†_i c†_j c_k c_l` from coefficient arrays
   (`one_body`, `two_body`/`onsite_u`), literal coefficients, only nonzero
@@ -99,6 +107,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   attractive disordered chain), `examples` extra (matplotlib), smoke-tested headless in CI.
 
 ### Changed
+- `Hopping` and the visualization layer now share one bond-list builder
+  (`operators.bond_pairs`); as a side effect `Hopping(connections=<ndarray>)`
+  works instead of tripping the elementwise string comparison (pinned by a
+  bit-equality regression test, issue #40).
 - `hopping`, `correlator`, `correlator_m` share one transition-matrix builder with a
   unified row/output storage convention.
 - `time_evolution_exact_ind` returns complex results; imaginary parts of non-Hermitian

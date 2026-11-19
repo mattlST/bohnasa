@@ -45,9 +45,10 @@ growth and Krylov complexity after a quench.
   special case
 - `bohnasa.visualization` — the geometric view of evolved data: ring/chain
   geometry sharing the `Hopping` bond list, `draw_lattice` snapshots,
-  `animate_lattice` replays (node area linear in occupation, edges
-  colored by the continuity-pinned bond current), and occupation/momentum
-  heatmaps; matplotlib is imported lazily via the `examples` extra
+  `animate_lattice` replays (node area linear in occupation; edge base
+  encoding the bond energy `2 Re gamma_ij` that sums to `<Hopping>`, with
+  arrowheads showing the continuity-pinned bond current), and occupation/
+  momentum heatmaps; matplotlib is imported lazily via the `examples` extra
 - runnable [examples](examples/README.md) covering all of the above
 
 ## Install

@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- Time-resolved lattice visualization (`bohnasa.visualization`): ring/chain
+  geometry (`lattice_geometry`, `lattice_bonds`) sharing one bond-list builder
+  with `Hopping` (`operators.bond_pairs`, including the deliberate `L = 2` PBC
+  double counting), static snapshots (`draw_lattice`), headless deterministic
+  trajectory replays (`animate_lattice`) and 2-D fallback views
+  (`occupation_heatmap`, `momentum_heatmap`). Visual grammar: node circle area
+  linear in on-site occupation, edges encoding the bond current
+  `j_ij = i (gamma_ji - gamma_ij) = 2 Im gamma_ij` (width in `|j|`, diverging
+  `coolwarm` color; coherence `|gamma_ij|` as alternative mode; optional
+  doublon overlay from `pair_correlation`), with all normalizations
+  trajectory-wide. Colormaps are colorblind-safe, colorbars accompany any
+  color-encoded data, and matplotlib is imported lazily (`examples` extra;
+  runtime floor stays numpy + scipy). Pinned by a continuity-equation
+  derivation test and the `Hopping` bond-list identity, illustrated by
+  `examples/ex12_lattice_visualization.py` (issue #40).
 - Generic one-/two-body Hamiltonian builder (`Hamiltonian`): normal-ordered
   `Σ t_ij c†_i c_j + Σ V_ijkl c†_i c†_j c_k c_l` from coefficient arrays
   (`one_body`, `two_body`/`onsite_u`), literal coefficients, only nonzero

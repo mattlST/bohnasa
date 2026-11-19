@@ -18,6 +18,7 @@ thesis cited in ``CITATION.cff`` (quarter-circle system, off-phase saddle).
 """
 
 import numpy as np
+from scipy.integrate import solve_ivp
 
 __all__ = [
     "dimer_fixed_points",
@@ -103,10 +104,8 @@ def dimer_jacobian(theta: float, s: float, phi: float) -> np.ndarray:
     )
 
 
-def mean_field_flow(
-    theta: float, initial: tuple[float, float], times: np.ndarray, n_steps: int = 4000
-) -> np.ndarray:
-    """Integrate the classical dimer flow with fixed-step RK4.
+def mean_field_flow(theta: float, initial: tuple[float, float], times: np.ndarray) -> np.ndarray:
+    """Integrate the classical dimer flow with an adaptive DOP853.
 
     Parameters
     ----------
@@ -115,9 +114,8 @@ def mean_field_flow(
     initial : tuple of float
         Starting ``(s, phi)``.
     times : numpy.ndarray
-        Sample times (need not be sorted).
-    n_steps : int, default 4000
-        RK4 steps over ``max(times)``.
+        Sample times (need not be sorted; duplicates allowed). Times at or
+        below zero report the initial state: the flow starts at ``t = 0``.
 
     Returns
     -------
@@ -135,31 +133,42 @@ def mean_field_flow(
     True
     """
     times = np.asarray(times, dtype=float)
+    if times.ndim != 1 or times.size == 0:
+        raise ValueError("mean_field_flow: times must be a non-empty 1D array")
+    if not np.all(np.isfinite(times)):
+        raise ValueError("mean_field_flow: times must be finite")
     y0 = np.asarray(initial, dtype=complex).ravel()
     if y0.size != 2 or np.abs(y0.imag).max() > 1e-12:
         raise ValueError("mean_field_flow: initial must be a real pair (s, phi)")
+    s0, phi0 = float(y0[0].real), float(y0[1].real)
     order = np.argsort(times)
-    out = np.empty((len(times), 2))
-    s, phi = float(y0[0].real), float(y0[1].real)
-    t_now = 0.0
-    t_max = times.max()
-    h = t_max / n_steps if t_max > 0 else 1.0
     targets = times[order]
-    k_idx = 0
-    for i in range(n_steps + 1):
-        while k_idx < len(targets) and targets[k_idx] <= t_now + 1e-12:
-            out[order[k_idx]] = (s, phi)
-            k_idx += 1
-        if k_idx >= len(targets) or i == n_steps:
-            break
-        k1 = _mf_fields(s, phi, theta)
-        k2 = _mf_fields(s + 0.5 * h * k1[0], phi + 0.5 * h * k1[1], theta)
-        k3 = _mf_fields(s + 0.5 * h * k2[0], phi + 0.5 * h * k2[1], theta)
-        k4 = _mf_fields(s + h * k3[0], phi + h * k3[1], theta)
-        s += h / 6.0 * (k1[0] + 2 * k2[0] + 2 * k3[0] + k4[0])
-        phi += h / 6.0 * (k1[1] + 2 * k2[1] + 2 * k3[1] + k4[1])
-        t_now = i * h + h
-    while k_idx < len(targets):
-        out[order[k_idx]] = (s, phi)
-        k_idx += 1
+    out = np.empty((len(times), 2))
+    future = targets > 0.0
+    out[order[~future]] = (s0, phi0)
+    if np.any(future):
+        # DOP853 (issue #24): adaptive high-order integration of the smooth
+        # 2D flow, with tolerances fixed by the issue. solve_ivp rejects
+        # duplicate t_eval entries, so the sorted targets are deduplicated
+        # and mapped back with np.unique's inverse index.
+        unique, inverse = np.unique(targets[future], return_inverse=True)
+
+        def rhs(_t: float, y: np.ndarray) -> np.ndarray:
+            """``solve_ivp`` right-hand side ``f(t, y)`` (autonomous flow;
+            explicit signature for the strict scipy-stubs on py3.10/3.11)."""
+            ds, dphi = _mf_fields(float(y[0]), float(y[1]), theta)
+            return np.array([ds, dphi])
+
+        sol = solve_ivp(
+            rhs,
+            (0.0, float(targets[-1])),
+            np.array([s0, phi0]),
+            t_eval=unique,
+            method="DOP853",
+            rtol=1e-10,
+            atol=1e-12,
+        )
+        if not sol.success:
+            raise RuntimeError(f"mean_field_flow: integration failed: {sol.message}")
+        out[order[future]] = sol.y.T[inverse]
     return out

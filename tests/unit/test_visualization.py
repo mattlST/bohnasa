@@ -119,14 +119,14 @@ def test_draw_lattice_node_area_monotonic_linear(figax):
 
 def test_draw_lattice_edge_width_monotonic_zero_anchored_and_sign_symmetric(figax):
     fig, ax = figax
-    currents = np.array([0.0, 1.0, -2.0, 2.0])
-    viz.draw_lattice(ax, viz.lattice_geometry(4), edge_widths=currents)
+    base = np.array([0.0, 1.0, -2.0, 2.0])
+    viz.draw_lattice(ax, viz.lattice_geometry(4), edge_widths=base)
     widths = np.array([line.get_linewidth() for line in ax.lines])
     w0, w1 = viz._EDGE_WIDTH_RANGE
     assert widths[0] == pytest.approx(w0)  # zero base value draws minimum width
     assert widths[1] == pytest.approx(w0 + (w1 - w0) * 0.5)
     assert widths[2] == pytest.approx(w1)
-    assert widths[3] == pytest.approx(widths[2])  # |j| encodes, sign does not (width)
+    assert widths[3] == pytest.approx(widths[2])  # |base| sets width, sign only colors
     plt.close(fig)
 
 
@@ -165,15 +165,28 @@ def test_draw_lattice_colorbars_only_when_color_encodes(figax):
 
 
 def test_draw_lattice_signed_edge_base_defaults_symmetric_zero_neutral(figax):
+    """M10 discriminator: plain min/max normalization must fail here.
+
+    With the ASYMMETRIC array [-1, 0, 2, 3] the symmetric default maps 0
+    to the coolwarm center (norm fraction 0.5) while a min/max norm maps
+    it to 0.25 - different colors, so the test only passes when the
+    default really is the symmetric +-max|e| interval.
+    """
     fig, ax = figax
-    # default edge normalization is the symmetric +-max|e| interval, so
-    # zero bond energy sits exactly at the diverging colormap center
-    viz.draw_lattice(ax, viz.lattice_geometry(4), edge_colors=[-4.0, 0.0, 2.0, 4.0])
-    assert matplotlib_color(ax.lines[1].get_color()) == pytest.approx(
-        matplotlib_color(plt.cm.coolwarm(0.5)), abs=1e-12
-    )
+    viz.draw_lattice(ax, viz.lattice_geometry(4), edge_colors=[-1.0, 0.0, 2.0, 3.0])
+    symmetric = matplotlib_color(plt.cm.coolwarm(0.5))
+    minmax = matplotlib_color(plt.cm.coolwarm(0.25))
+    assert matplotlib_color(ax.lines[1].get_color()) == pytest.approx(symmetric, abs=1e-12)
+    assert not np.allclose(matplotlib_color(ax.lines[1].get_color()), minmax, atol=1e-3)
+    # value -1 sits at fraction 1/3 under the symmetric +-3 norm, at 0.0
+    # under min/max: both checks pin the actual default, not just zero
     assert matplotlib_color(ax.lines[0].get_color()) == pytest.approx(
-        matplotlib_color(plt.cm.coolwarm(0.0)), abs=1e-12
+        matplotlib_color(plt.cm.coolwarm(1.0 / 3.0)), abs=1e-12
+    )
+    assert not np.allclose(
+        matplotlib_color(ax.lines[0].get_color()),
+        matplotlib_color(plt.cm.coolwarm(0.0)),
+        atol=1e-3,
     )
     plt.close(fig)
 
@@ -186,11 +199,11 @@ def test_draw_lattice_arrowhead_threshold_size_and_direction(figax):
     assert [patch.get_visible() for patch in ax.patches] == [True, True, False, False]
     lo, hi = viz._ARROW_SCALE_RANGE
     assert ax.patches[0].get_mutation_scale() == pytest.approx(hi)
-    tail0, head0 = ax.patches[0]._posA_posB
+    tail0, head0 = ax.patches[0]._posA_posB  # matplotlib-internal, test-only probe
     # negative j on (0, 3): reversed arrow, tail nearer the second site
     assert np.linalg.norm(tail0 - xy[3]) < np.linalg.norm(tail0 - xy[0])
     assert np.linalg.norm(head0 - xy[0]) < np.linalg.norm(head0 - xy[3])
-    tail1, _ = ax.patches[1]._posA_posB
+    tail1, _ = ax.patches[1]._posA_posB  # matplotlib-internal, test-only probe
     # positive j on (1, 0): forward arrow, tail nearer the first site
     assert np.linalg.norm(tail1 - xy[1]) < np.linalg.norm(tail1 - xy[0])
     # explicit arrow_threshold moves the cutoff: with 0.8 the third bond
@@ -202,9 +215,53 @@ def test_draw_lattice_arrowhead_threshold_size_and_direction(figax):
     ax3 = plt.subplots(figsize=(3.0, 3.0), dpi=50)[1]
     viz.draw_lattice(ax3, xy, edge_currents=[-0.5, 0.5, 0.3, 0.0])  # default cutoff
     assert [patch.get_visible() for patch in ax3.patches] == [True, True, True, False]
+    # M12 discriminator: 0.3 is between 5% and 50% of the max, so mutating
+    # the default threshold constant 0.05 -> 0.5 turns bond 2 invisible.
+    # Boundary at the explicitly pinned trajectory norm current_scale=1:
+    # |j| = 0.05 exactly at the cutoff stays hidden, the next float shows.
+    ax4 = plt.subplots(figsize=(3.0, 3.0), dpi=50)[1]
+    boundary = np.nextafter(0.05, 1.0)
+    viz.draw_lattice(ax4, xy, edge_currents=[0.05, boundary, 0.3, 0.0], current_scale=1.0)
+    assert [patch.get_visible() for patch in ax4.patches] == [False, True, True, False]
+    assert ax4.patches[1].get_mutation_scale() == pytest.approx(
+        viz._ARROW_SCALE_RANGE[0]
+        + (viz._ARROW_SCALE_RANGE[1] - viz._ARROW_SCALE_RANGE[0]) * boundary
+    )
+    assert ax4.patches[2].get_mutation_scale() == pytest.approx(
+        viz._ARROW_SCALE_RANGE[0] + (viz._ARROW_SCALE_RANGE[1] - viz._ARROW_SCALE_RANGE[0]) * 0.3
+    )
     plt.close(fig)
     plt.close(ax2.figure)
     plt.close(ax3.figure)
+    plt.close(ax4.figure)
+
+
+def test_animate_arrow_size_normalization_is_trajectory_wide():
+    """Frame-0 arrowhead size normalizes by the trajectory current max,
+    which sits at a NONZERO frame index. Here frame 0's strongest bond has
+    |j| = 0.25 = half the trajectory max 0.5, so its head size is the ramp
+    midpoint 25.0; a per-frame normalization mutant gives the top 40.0.
+    """
+    times = np.array([0.0, 1.0, 2.0])
+    occ = np.full((3, 4), 0.5)
+    # trajectory current max 0.50 sits at bond (2, 1) of frame 2 - a nonzero
+    # frame index; frame 0's own strongest bond carries j = 2 Im gamma_(1,0)
+    # = 2 * 0.125 = 0.25, half the trajectory norm
+    gamma = np.array(
+        [
+            _gamma_from_bond_values(4, {(1, 0): 0.125j}),  # j = 0.25 in frame 0
+            _gamma_from_bond_values(4, {(1, 0): 0.05j}),  # j = 0.10
+            _gamma_from_bond_values(4, {(2, 1): 0.25j}),  # j = 0.50 - trajectory max
+        ]
+    )
+    ax, anim = _animate(times, occ, gamma)
+    lo, hi = viz._ARROW_SCALE_RANGE
+    # frame-0 bond (1, 0) is list index 1; |j| = 0.25, j_scale = 0.5 -> ratio 0.5
+    assert ax.patches[1].get_visible() is True
+    assert ax.patches[1].get_mutation_scale() == pytest.approx(lo + (hi - lo) * 0.5)
+    # per-frame normalization would map frame 0's own max (0.25) to hi
+    assert ax.patches[1].get_mutation_scale() != pytest.approx(hi)
+    plt.close("all")
 
 
 def test_draw_lattice_validates_data_lengths(figax):
@@ -516,3 +573,184 @@ def test_module_imports_without_matplotlib():
     )
     assert result.returncode == 0, result.stderr
     assert "imported" in result.stdout
+
+
+# ---------------------------------------------------------------------------
+# round-3: noise floor, annotations, shared colorbars, trajectory scales
+# ---------------------------------------------------------------------------
+
+
+def test_noise_floor_energy_only_noise_renders_degenerate(figax):
+    """B2 (physics verifier M-finding): the L=2 state built from
+    phi = exp(i pi/2 j) has |e| = 6.12e-17 round-off only; truthiness
+    guards (`max or 1.0`) let it self-normalize to MAX width and the
+    colormap extreme. With the floor it renders minimum width + center
+    color, while the real current on the same state still draws arrows."""
+    fig, ax = figax
+    fock = bohnasa.FixedNFockSpace(1, 2)
+    phi = np.exp(1j * (np.pi / 2) * np.arange(2))
+    state = bohnasa.fixed_n_coherent_state(fock, phi)
+    gamma = bohnasa.one_body_density_matrix(state, fock)
+    bonds = viz.lattice_bonds(2, "pbc")
+    e = viz.bond_energy(gamma, bonds)
+    j = viz.bond_current(gamma, bonds)
+    assert 0.0 < float(np.abs(e).max()) < viz._NOISE_FLOOR  # truthy round-off
+    assert float(np.abs(j).max()) == pytest.approx(1.0)  # genuine signal
+    viz.draw_lattice(
+        ax, viz.lattice_geometry(2, "pbc"), edge_widths=e, edge_colors=e, edge_currents=j
+    )
+    w0, _ = viz._EDGE_WIDTH_RANGE
+    for line in ax.lines:
+        assert line.get_linewidth() == pytest.approx(w0)
+        assert matplotlib_color(line.get_color()) == pytest.approx(
+            matplotlib_color(plt.cm.coolwarm(0.5)), abs=1e-9
+        )
+    assert [patch.get_visible() for patch in ax.patches] == [True, True]
+    plt.close(fig)
+
+
+def test_noise_floor_current_trajectory_draws_no_arrows():
+    """B2, second measured state: the k=0 quench trajectory under
+    U = 1 carries only round-off current (measured max |j| ~ 6.11e-16,
+    strictly positive so `j_scale <= 0` guards miss it). Truthiness-based
+    normalization self-scaled this noise to full-size arrows on every
+    bond; the floor must hide all of them."""
+    N, L = 3, 6
+    fock = bohnasa.FixedNFockSpace(N, L)
+    psi0 = bohnasa.fixed_n_coherent_state(fock, np.ones(L) / np.sqrt(L))
+    H = bohnasa.Hopping(fock, "pbc") * (-1.0) + bohnasa.Interaction(fock) * 0.5
+    times = np.linspace(0.0, 4.0, 25)
+    ops = [bohnasa.Correlator(fock, j, i) for i in range(L) for j in range(L)]
+    res = bohnasa.time_evolution_exact_ind(H, psi0, times, ops)
+    gamma_t = np.empty((len(times), L, L), complex)
+    for i in range(L):
+        for j in range(L):
+            gamma_t[:, i, j] = res[i * L + j, 0, :]
+    bonds = viz.lattice_bonds(L, "pbc")
+    j_t = np.array([viz.bond_current(g, bonds) for g in gamma_t])
+    worst = int(np.argmax(np.abs(j_t).max(axis=1)))
+    assert 0.0 < float(np.abs(j_t).max()) < viz._NOISE_FLOOR  # measured above
+    ax, anim = _animate(times, np.full((len(times), L), 1.0), gamma_t)
+    assert not any(patch.get_visible() for patch in ax.patches)
+    # step the noisiest frame (frame 0 is exactly real, its noise sits deep):
+    anim._func(worst)
+    assert not any(patch.get_visible() for patch in ax.patches)
+    plt.close("all")
+
+
+def test_noise_floor_node_sizes_map_constant_data_to_midpoint(figax):
+    """Node branch of the floor: occupations differing only by one ULP
+    (spread 8.9e-16 < the 1e-14 floor) must not self-normalize; an
+    equality-only degeneracy check misses them (mutant ME) and would map
+    the top ULP to the full maximum area. They map to the midpoint."""
+    fig, ax = figax
+    hi_v = float(np.nextafter(2.0, np.inf))
+    lo_v = float(np.nextafter(2.0, 0.0))
+    occ = np.array([hi_v, lo_v, 2.0, 2.0])
+    assert hi_v - lo_v < viz._NOISE_FLOOR and hi_v != lo_v  # premise, measured
+    viz.draw_lattice(ax, viz.lattice_geometry(4, "obc"), node_sizes=occ)
+    lo, hi = viz._NODE_SIZE_RANGE
+    assert np.allclose(ax.collections[0].get_sizes(), 0.5 * (lo + hi))
+    assert not np.allclose(ax.collections[0].get_sizes()[0], hi)  # ME mutant would
+    plt.close(fig)
+
+
+def test_draw_lattice_colorbar_flag_suppresses_bars_for_shared_pair(figax):
+    """A3a support: with colorbar=False the panels carry no bars so the
+    strip can add ONE shared pair for the whole figure."""
+    fig, ax = figax
+    data = [1.0, 2.0, 3.0, 4.0]
+    viz.draw_lattice(
+        ax, viz.lattice_geometry(4), node_colors=data, edge_colors=data, colorbar=False
+    )
+    assert len(fig.axes) == 1  # caller adds the single shared pair itself
+    assert ax.collections[0].get_clim() == (1.0, 4.0)  # norms still applied
+    plt.close(fig)
+
+
+def test_draw_lattice_trajectory_scales_replay_frame_scaling(figax):
+    """edge_scale/current_scale pin the trajectory-wide norms so a static
+    panel reproduces exactly the animation's width/color/arrow encoding."""
+    fig, ax = figax
+    base = np.array([0.5, 0.0, 0.0, 0.0])
+    cur = np.array([0.25, 0.0, 0.0, 0.0])
+    w0, w1 = viz._EDGE_WIDTH_RANGE
+    lo, hi = viz._ARROW_SCALE_RANGE
+    viz.draw_lattice(
+        ax,
+        viz.lattice_geometry(4),
+        edge_widths=base,
+        edge_colors=base,
+        edge_currents=cur,
+        edge_scale=1.0,
+        current_scale=0.5,
+    )
+    # width by the trajectory base max 1.0 (frame max is only 0.5):
+    assert ax.lines[0].get_linewidth() == pytest.approx(w0 + (w1 - w0) * 0.5)
+    # color symmetric bounds +-1.0 from edge_scale (not the frame's +-0.5):
+    assert matplotlib_color(ax.lines[0].get_color()) == pytest.approx(
+        matplotlib_color(plt.cm.coolwarm(0.75)), abs=1e-12
+    )
+    # arrow size by the trajectory current max 0.5 (frame max is 0.25):
+    assert ax.patches[0].get_mutation_scale() == pytest.approx(lo + (hi - lo) * 0.5)
+    plt.close(fig)
+
+
+def test_animate_annotation_artists_and_live_readout():
+    times = np.array([0.0, 1.0])
+    occ = np.array([[1.0, 1.0], [0.5, 1.5]])
+    ax, anim = _animate(
+        times,
+        occ,
+        header=["L=2 ring  test header"],
+        legend=True,
+        live=[("t", times, "4.1f"), ("2n", 2.0 * occ[:, 0], "+.2f")],
+    )
+    fig = ax.figure
+    assert len(fig.texts) == 3  # header, legend, live readout
+    assert fig.texts[0].get_text() == "L=2 ring  test header"
+    assert fig.texts[1].get_text().startswith("node area propto <n_i> in [0.50, 1.50]")
+    assert fig.texts[2].get_text() == "t =  0.0   2n = +2.00"
+    anim._func(1)  # step the real callback; live line must follow the frame
+    assert fig.texts[2].get_text() == "t =  1.0   2n = +1.00"
+    plt.close("all")
+
+
+def test_animate_auto_legend_states_the_norms_used():
+    times = np.array([0.0, 1.0])
+    occ = np.array([[0.0, 2.0], [1.0, 1.0]])
+    gamma = np.array(
+        [
+            _gamma_from_bond_values(2, {(0, 1): 0.5 + 0.25j}),
+            _gamma_from_bond_values(2, {(0, 1): 0.2 + 0.1j}),
+        ]
+    )
+    # pbc L=2 double bond: base values [1.0, 1.0] & [0.4, 0.4]; currents
+    # [0.5, -0.5] & [0.2, -0.2] -> norms +-1.0 (e) and 0.5 (j), cutoff 0.025
+    ax, anim = _animate(times, occ, gamma, doublons=np.array([[1.0, 0.0], [0.0, 1.0]]), legend=True)
+    legend = ax.figure.texts[0].get_text().splitlines()
+    assert legend == [
+        "node area propto <n_i> in [0.00, 2.00]   edge width+color propto 2Re g_ij (-1.00..+1.00)",
+        "arrows propto j_ij = 2Im g_ij (+-0.50)   no arrow |j| <= 0.025"
+        "   squares: doublons n_i(n_i-1)",
+    ]
+    plt.close("all")
+
+
+def test_annotated_gif_is_deterministic_and_text_affects_pixels(tmp_path):
+    times = np.linspace(0.0, 1.0, 3)
+    occ = np.tile([1.0, 0.5, 1.0, 0.5], (3, 1))
+    gamma = np.stack([_gamma_from_bond_values(4, {(1, 0): 0.3 + 0.2j})] * 3)
+
+    def save(path, **anno):
+        ax = _tiny_axis()
+        anim = viz.animate_lattice(times, occ, gamma, ax=ax, **anno)
+        anim.save(path, writer="pillow", fps=10)
+        plt.close("all")
+
+    save(tmp_path / "a.gif", header="h", legend="l", live=[("t", times, "3.1f")])
+    save(tmp_path / "a2.gif", header="h", legend="l", live=[("t", times, "3.1f")])
+    save(tmp_path / "plain.gif")
+    annotated = (tmp_path / "a.gif").read_bytes()
+    assert annotated == (tmp_path / "a2.gif").read_bytes()  # deterministic
+    assert annotated != (tmp_path / "plain.gif").read_bytes()  # text rendered in

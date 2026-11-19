@@ -78,11 +78,13 @@ def test_bond_energy_winding_anchor_and_sum_rule():
     assert np.allclose(j, -2.0 * (N / L) * np.sin(k), atol=1e-14)
 
 
-@pytest.mark.parametrize("connections", ["pbc", "obc"])
-def test_bond_energy_sums_to_hopping_for_any_state(connections):
+@pytest.mark.parametrize("connections, L", [("pbc", 5), ("obc", 5), ("pbc", 2)])
+def test_bond_energy_sums_to_hopping_for_any_state(connections, L):
     """Algebraic identity of the shared bond list: sum_bonds 2 Re gamma_ij
-    == <Hopping> for every normalized state, both geometries."""
-    N, L = 3, 5
+    == <Hopping> for every normalized state, both geometries - including
+    the L = 2 PBC ring, whose doubled bond list gives Sigma e = 4 Re
+    gamma_01 = <Hopping> with the double-counted hopping amplitude."""
+    N = 3
     fock = bohnasa.FixedNFockSpace(N, L)
     hop = bohnasa.Hopping(fock, connections=connections)
     rng = np.random.default_rng(17)

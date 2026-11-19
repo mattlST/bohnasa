@@ -61,7 +61,10 @@ from numpy.typing import ArrayLike
 from .operators import bond_pairs
 
 if TYPE_CHECKING:
+    from collections.abc import Iterable
+
     from matplotlib.animation import FuncAnimation
+    from matplotlib.artist import Artist
     from matplotlib.axes import Axes
 
 __all__ = [
@@ -714,8 +717,12 @@ def animate_lattice(
     doublon_layer = None if dbl is None else artists.add_doublons(doublon_areas(dbl[0]))
     title = ax.set_title("")
 
-    def frame(k: int) -> None:
-        """Apply data frame k - a pure function of k, hence deterministic."""
+    def frame(k: int) -> Iterable[Artist]:
+        """Apply data frame k - a pure function of k, hence deterministic.
+
+        Returns the updated artists (the ``FuncAnimation`` callback
+        contract; harmless with ``blit=False``, forward-compatible).
+        """
         sizes = _scale_linear(occ[k], node_vmin, node_vmax, *node_size_range)
         widths = None
         if edge_series is not None:
@@ -729,6 +736,10 @@ def animate_lattice(
             edge_colors=None if edge_series is None else edge_series[k],
         )
         title.set_text(f"t = {times[k]:g}")
+        updated: list[Artist] = [artists.nodes, title, *artists.lines]
+        if doublon_layer is not None:
+            updated.append(doublon_layer)
+        return updated
 
     frame(0)
     return animation.FuncAnimation(

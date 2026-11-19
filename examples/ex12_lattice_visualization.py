@@ -1,20 +1,24 @@
 """Example 12: what does a quenched Bose-Hubbard ring *look like*?
 
-Question: can the lattice view of issue #40 turn the numeric tables of the
-observables module into a picture that is simultaneously (a) faithful - the
-drawn bonds are literally the Hamiltonian's bond list, and the edge color
-is the bond current pinned by the continuity equation - and (b)
-reproducible - the saved GIF and the PNG frame strip are byte-identical
-across repeated builds?
+Question: can the lattice view of issue #40 (amended grammar) turn the
+numeric tables of the observables module into a picture that is
+simultaneously (a) faithful - the drawn bonds are literally the
+Hamiltonian's bond list, the edge base encodes the symmetric bond energy
+``e_ij = 2 Re gamma_ij`` whose bond sum equals ``<Hopping>`` exactly, and
+the arrowheads encode the current ``j_ij = 2 Im gamma_ij`` pinned by the
+continuity equation - and (b) reproducible: the saved GIF and PNG frame
+strip are byte-identical across repeated builds?
 
-Protocol: N = 6 bosons on an L = 6 ring; all particles start on site 0
-(Fock state |6,0,0,0,0,0>, a maximally unbalanced quench), evolving under
--t sum(c^dag_j c_i + h.c.) + (U/2) sum n_i(n_i-1) with t = 1, U = 1
-(``Interaction * 0.5`` in the module's unit convention). Nodes pulse with
-the on-site occupation (area linear in <n_i>), edges light up with the bond
-current from ``one_body_density_matrix``, and square outlines track
-doublons ``<n_i(n_i-1)>``. The same arrays feed the 2-D fallback heatmaps.
-Exact diagonalization propagates the state (dim = 462, all headless).
+Protocol: N = 6 bosons on an L = 6 ring, starting as a Gaussian packet
+(occupation widths sigma = 1.5 sites around site 0) with winding k0 =
+2 pi / 6 - a CURRENT-CARRYING quench: the parity-symmetric density-only
+initial states (Fock |6,0,...> or the k = 0 plane wave) have gamma real
+and hence j_ij = 0 everywhere, which would leave the arrow channel empty.
+The packet circulates with group velocity 2 t sin(k0) while spreading
+under U = 1 (``Interaction * 0.5`` in the module's unit convention,
+t = 1). Node area pulses with ``<n_i>``, edges shade with the bond
+energy, arrowheads show the current, squares track doublons. Exact
+diagonalization propagates the state (dim = 462, all headless).
 """
 
 import hashlib
@@ -32,12 +36,14 @@ from bohnasa import (
     Number,
     Operator,
     density_profile,
+    fixed_n_coherent_state,
     one_body_density_matrix,
     time_evolution_exact_ind,
 )
 from bohnasa.visualization import (
     animate_lattice,
     bond_current,
+    bond_energy,
     draw_lattice,
     lattice_bonds,
     lattice_geometry,
@@ -50,18 +56,22 @@ U_HALF = 0.5  # Interaction * 0.5 is the (U/2) n(n-1) term, i.e. U = 1
 N_TIME = 49
 
 fock = FixedNFockSpace(N, L)
-H = Hopping(fock, connections="pbc") * (-1.0) + Interaction(fock) * U_HALF
+hop = Hopping(fock, connections="pbc")
+H = hop * (-1.0) + Interaction(fock) * U_HALF
 
-psi0 = np.zeros(fock.dim, dtype=complex)
-psi0[fock.dict[(N, 0, 0, 0, 0, 0)]] = 1.0
+# Gaussian packet with winding k0 = 2 pi / 6 (wrapped distance from site 0)
+k0 = 2.0 * np.pi / L
+dj = np.minimum(np.arange(L), L - np.arange(L))
+phi0 = np.exp(-(dj**2) / (4.0 * 1.5**2) + 1j * k0 * np.arange(L))
+psi0 = fixed_n_coherent_state(fock, phi0)
 times = np.linspace(0.0, 6.0, N_TIME)
 
 # Observables measured inside one time_evolution_exact_ind call:
 # per-site Number, the L^2 Correlators (Correlator(fock, j, i) = c^dag_i c_j
 # is gamma_ij), doublon operators n_i(n_i-1) as bare diagonal Operators,
-# and the momentum-mode operators a^dag_k a_k assembled from Correlators
-# with the convention a_k = L^(-1/2) sum_j exp(-i k j) c_j of
-# momentum_distribution.
+# the momentum-mode operators a^dag_k a_k assembled from Correlators with
+# the convention a_k = L^(-1/2) sum_j exp(-i k j) c_j of
+# momentum_distribution, and the bare Hopping (the bond-energy sum rule).
 number_ops = [Number(fock, i) for i in range(L)]
 correlator_ops = [Correlator(fock, j, i) for i in range(L) for j in range(L)]
 doublon_ops = []
@@ -74,59 +84,72 @@ momentum_ops = []
 for mode in range(L):
     k = 2.0 * np.pi * mode / L
     mat = sp.csr_matrix((fock.dim, fock.dim), dtype=complex)
+    # a^dag_k a_k = (1/L) sum_ij exp(i k (i - j)) c^dag_i c_j for
+    # a_k = L^(-1/2) sum_j exp(-i k j) c_j  (the momentum_distribution convention)
     for i in range(L):
         for j in range(L):
-            mat = mat + np.exp(1j * k * (j - i)) / L * Correlator(fock, j, i).matrix
+            mat = mat + np.exp(1j * k * (i - j)) / L * Correlator(fock, j, i).matrix
     op = Operator(fock)
     op.matrix = mat
     momentum_ops.append(op)
 
 result = time_evolution_exact_ind(
-    H, psi0, times, number_ops + correlator_ops + doublon_ops + momentum_ops
+    H, psi0, times, number_ops + correlator_ops + doublon_ops + momentum_ops + [hop]
 )
-n_obs = result.shape[0]
-assert n_obs == 2 * L + L * L + L
+assert result.shape[0] == 3 * L + L * L + 1
 
-# Number, doublon and momentum observables are Hermitian, so their
+# Number, doublon, momentum and Hopping are Hermitian observables, so their
 # imaginary parts are numerical noise only and are dropped with .real.
-# result rows: Number (0:L), Correlators (L:L+L^2), doublons, momenta
 n_i_t = result[:L, 0, :].real.T  # (T, L)
 gamma_t = np.empty((N_TIME, L, L), dtype=complex)
 for i in range(L):
     for j in range(L):
         gamma_t[:, i, j] = result[L + i * L + j, 0, :]
 dbl_t = result[L + L * L : 2 * L + L * L, 0, :].real.T
-n_k_t = result[2 * L + L * L :, 0, :].real.T
+n_k_t = result[2 * L + L * L : 3 * L + L * L, 0, :].real.T
+hop_t = result[3 * L + L * L, 0, :].real  # <Hopping>(t)
 
 print(f"dimension {fock.dim}, {N_TIME} frames, final time t = {times[-1]:g}")
 
 # --- physics anchors -------------------------------------------------------
 norm_dev = float(np.abs(n_i_t.sum(axis=1) - N).max())
 assert norm_dev < 1e-9, norm_dev
-assert np.abs(n_i_t[0] - np.array([N] + [0.0] * (L - 1))).max() < 1e-12
+assert np.abs(n_i_t[0] - density_profile(psi0, fock)).max() < 1e-12
+assert np.abs(n_i_t[0, 0] - 1.6859) < 1e-4  # packet peak on site 0
 g0 = one_body_density_matrix(psi0, fock)
-assert np.allclose(g0, np.diag(n_i_t[0].astype(complex)))
+assert np.allclose(g0.real.diagonal(), n_i_t[0])
 # the drawn bonds ARE the Hamiltonian's bond list (issue #40 requirement 2)
-np.testing.assert_array_equal(lattice_bonds(L, "pbc"), H.connections)
+np.testing.assert_array_equal(lattice_bonds(L, "pbc"), hop.connections)
 bonds = lattice_bonds(L, "pbc")
 j_t = np.array([bond_current(g, bonds) for g in gamma_t])
-assert j_t.dtype == float  # the encoded current is real by construction
-assert np.abs(j_t).max() > 0.1  # the quench genuinely circulates
+e_t = np.array([bond_energy(g, bonds) for g in gamma_t])
+assert j_t.dtype == float and e_t.dtype == float
+
+# the bond-energy sum rule: sum of e_ij over the bond list is <Hopping>
+sum_rule_dev = float(np.abs(e_t.sum(axis=1) - hop_t).max())
+assert sum_rule_dev < 1e-10, sum_rule_dev
+
+# the quench carries current: measured over this protocol the trajectory
+# max |j| is 2.6848..., well above the 5%-of-max no-arrow threshold
+j_max = float(np.abs(j_t).max())
+assert j_max > 2.5, j_max
+arrows_visible = (np.abs(j_t) > 0.05 * j_max).sum(axis=1)
+assert np.all(arrows_visible >= 1)  # every frame shows at least one arrowhead
+e_max = float(np.abs(e_t).max())
 mid = N_TIME // 2
-# the two measured routes must agree: diag(gamma) == <n_i> per frame
 assert np.abs(np.real(np.diag(gamma_t[mid])) - n_i_t[mid]).max() < 1e-10
-# the momentum-operator means equal the FFT of the measured gamma (same
-# convention, independent code paths): n_k = sum_ij conj(E_ki) gamma_ij E_kj
 k_vec = 2.0 * np.pi * np.arange(L) / L
 phase = np.exp(-1j * np.outer(k_vec, np.arange(L))) / np.sqrt(L)
 n_k_from_gamma = np.einsum("ki,tij,kj->tk", phase.conj(), gamma_t, phase).real
 assert np.abs(n_k_from_gamma - n_k_t).max() < 1e-9
-print(f"number conservation: max deviation {norm_dev:.1e}; |j|max = {np.abs(j_t).max():.3f}")
+print(f"number conservation: max deviation {norm_dev:.1e}")
+print(f"bond energy |e|max = {e_max:.4f}; sum-rule vs <Hopping> err {sum_rule_dev:.1e}")
+n_arrows = int((arrows_visible > 0).sum())
+print(f"bond current |j|max = {j_max:.4f}; arrows visible in {n_arrows}/{N_TIME} frames")
 
 # --- trajectory-wide normalization (never per frame) ----------------------
 node_bounds = (float(n_i_t.min()), float(n_i_t.max()))
-edge_abs_max = float(np.abs(j_t).max())
-edge_bounds = (-edge_abs_max, edge_abs_max)
+edge_bounds = (-e_max, e_max)  # symmetric: zero bond energy is the color center
 
 out_dir = Path(__file__).resolve().parent
 xy = lattice_geometry(L, "pbc")
@@ -142,8 +165,9 @@ def build_strip(path: Path) -> str:
             xy,
             node_sizes=n_i_t[frame],
             node_colors=n_i_t[frame],
-            edge_widths=j_t[frame],
-            edge_colors=j_t[frame],
+            edge_widths=e_t[frame],
+            edge_colors=e_t[frame],
+            edge_currents=j_t[frame],
             node_vmin=node_bounds[0],
             node_vmax=node_bounds[1],
             edge_vmin=edge_bounds[0],
@@ -195,7 +219,9 @@ plt.close(fig)
 print("saved ex12_heatmaps.png")
 
 # sanity of the fallback arrays against the density anchor
-assert np.abs(density_profile(psi0, fock) - n_i_t[0]).max() < 1e-12
 assert np.abs(n_k_t.sum(axis=1) - N).max() < 1e-9  # sum_k n_k = N
 
-print("issue #40 checks passed: bonds == Hopping bond list, strip and GIF byte-identical")
+print(
+    "issue #40 checks passed: bond list shared with Hopping, e-sum rule, "
+    "arrows drawn, strip and GIF byte-identical"
+)

@@ -85,14 +85,15 @@ def test_geometry_validation():
 
 def test_bond_helpers_validate_shapes():
     gamma = np.eye(3, dtype=complex)
-    with pytest.raises(ValueError, match="square"):
-        viz.bond_current(np.ones((2, 3)), [[0, 1]])
+    for helper in (viz.bond_energy, viz.bond_current, viz.bond_coherence):
+        with pytest.raises(ValueError, match="square"):
+            helper(np.ones((2, 3)), [[0, 1]])
     with pytest.raises(ValueError, match="square"):
         viz.bond_coherence(np.ones(3), [[0, 1]])
     with pytest.raises(ValueError, match=r"\(E, 2\)"):
         viz.bond_current(gamma, np.ones((3, 3)))
     with pytest.raises(ValueError, match=r"\[0, 3\)"):
-        viz.bond_current(gamma, [[0, 3]])
+        viz.bond_energy(gamma, [[0, 3]])
 
 
 # ---------------------------------------------------------------------------
@@ -122,7 +123,7 @@ def test_draw_lattice_edge_width_monotonic_zero_anchored_and_sign_symmetric(figa
     viz.draw_lattice(ax, viz.lattice_geometry(4), edge_widths=currents)
     widths = np.array([line.get_linewidth() for line in ax.lines])
     w0, w1 = viz._EDGE_WIDTH_RANGE
-    assert widths[0] == pytest.approx(w0)  # zero current draws minimum width
+    assert widths[0] == pytest.approx(w0)  # zero base value draws minimum width
     assert widths[1] == pytest.approx(w0 + (w1 - w0) * 0.5)
     assert widths[2] == pytest.approx(w1)
     assert widths[3] == pytest.approx(widths[2])  # |j| encodes, sign does not (width)
@@ -163,12 +164,57 @@ def test_draw_lattice_colorbars_only_when_color_encodes(figax):
     plt.close(fig)
 
 
+def test_draw_lattice_signed_edge_base_defaults_symmetric_zero_neutral(figax):
+    fig, ax = figax
+    # default edge normalization is the symmetric +-max|e| interval, so
+    # zero bond energy sits exactly at the diverging colormap center
+    viz.draw_lattice(ax, viz.lattice_geometry(4), edge_colors=[-4.0, 0.0, 2.0, 4.0])
+    assert matplotlib_color(ax.lines[1].get_color()) == pytest.approx(
+        matplotlib_color(plt.cm.coolwarm(0.5)), abs=1e-12
+    )
+    assert matplotlib_color(ax.lines[0].get_color()) == pytest.approx(
+        matplotlib_color(plt.cm.coolwarm(0.0)), abs=1e-12
+    )
+    plt.close(fig)
+
+
+def test_draw_lattice_arrowhead_threshold_size_and_direction(figax):
+    fig, ax = figax
+    xy = viz.lattice_geometry(4)
+    # bonds [(0,3), (1,0), (2,1), (3,2)]; j_scale 0.5, cutoff 0.05 * 0.5 = 0.025
+    viz.draw_lattice(ax, xy, edge_currents=[-0.5, 0.5, 0.01, 0.0])
+    assert [patch.get_visible() for patch in ax.patches] == [True, True, False, False]
+    lo, hi = viz._ARROW_SCALE_RANGE
+    assert ax.patches[0].get_mutation_scale() == pytest.approx(hi)
+    tail0, head0 = ax.patches[0]._posA_posB
+    # negative j on (0, 3): reversed arrow, tail nearer the second site
+    assert np.linalg.norm(tail0 - xy[3]) < np.linalg.norm(tail0 - xy[0])
+    assert np.linalg.norm(head0 - xy[0]) < np.linalg.norm(head0 - xy[3])
+    tail1, _ = ax.patches[1]._posA_posB
+    # positive j on (1, 0): forward arrow, tail nearer the first site
+    assert np.linalg.norm(tail1 - xy[1]) < np.linalg.norm(tail1 - xy[0])
+    # explicit arrow_threshold moves the cutoff: with 0.8 the third bond
+    # (|j| = 0.3 <= 0.8 * 0.5 = 0.4) is hidden although it draws above the
+    # default 0.05 cutoff
+    ax2 = plt.subplots(figsize=(3.0, 3.0), dpi=50)[1]
+    viz.draw_lattice(ax2, xy, edge_currents=[-0.5, 0.5, 0.3, 0.0], arrow_threshold=0.8)
+    assert [patch.get_visible() for patch in ax2.patches] == [True, True, False, False]
+    ax3 = plt.subplots(figsize=(3.0, 3.0), dpi=50)[1]
+    viz.draw_lattice(ax3, xy, edge_currents=[-0.5, 0.5, 0.3, 0.0])  # default cutoff
+    assert [patch.get_visible() for patch in ax3.patches] == [True, True, True, False]
+    plt.close(fig)
+    plt.close(ax2.figure)
+    plt.close(ax3.figure)
+
+
 def test_draw_lattice_validates_data_lengths(figax):
     fig, ax = figax
     with pytest.raises(ValueError, match="node_sizes must have 4 entries"):
         viz.draw_lattice(ax, viz.lattice_geometry(4), node_sizes=[1.0, 2.0])
     with pytest.raises(ValueError, match="edge_widths must have 4 entries"):
         viz.draw_lattice(ax, viz.lattice_geometry(4), edge_widths=[1.0, 2.0])
+    with pytest.raises(ValueError, match="edge_currents must have 4 entries"):
+        viz.draw_lattice(ax, viz.lattice_geometry(4), edge_currents=[1.0])
     plt.close(fig)
 
 
@@ -219,38 +265,56 @@ def test_animate_normalizes_nodes_over_the_whole_trajectory():
     plt.close("all")
 
 
-def _hermitian_gamma(L, bond_values):
-    """gamma with imaginary bond entries; real diagonal; Hermitian."""
+def _gamma_from_bond_values(L, bond_values):
+    """gamma with gamma[i, j] = value and gamma[j, i] = conj(value); real diagonal."""
     gamma = np.eye(L, dtype=complex)
     for (i, j), value in bond_values.items():
-        gamma[i, j] = 1j * value
-        gamma[j, i] = -1j * value
+        gamma[i, j] = value
+        gamma[j, i] = np.conj(value)
     return gamma
 
 
-def test_animate_edge_scale_is_trajectory_wide_not_per_frame():
+def test_animate_edge_base_is_energy_and_arrows_are_current():
+    """Width/color carry 2 Re gamma (symmetric +-max over the trajectory);
+
+    arrowheads carry 2 Im gamma: direction by sign, size proportional to
+    |j| under the trajectory-wide current norm, hidden below threshold.
+    """
     times = np.array([0.0, 1.0, 2.0])
     occ = np.full((3, 4), 0.5)
     gamma = np.array(
         [
-            _hermitian_gamma(4, {(0, 1): 0.25, (1, 2): 0.0, (2, 3): 0.0, (3, 0): 0.0}),
-            _hermitian_gamma(4, {(0, 1): 0.10, (1, 2): 0.0, (2, 3): 0.0, (3, 0): 0.0}),
-            _hermitian_gamma(4, {(0, 1): 0.50, (1, 2): 0.50, (2, 3): 0.50, (3, 0): 0.50}),
+            _gamma_from_bond_values(4, {(1, 0): 0.25 + 0.25j}),
+            _gamma_from_bond_values(4, {}),
+            _gamma_from_bond_values(4, {(0, 3): 0.5, (1, 0): 0.5, (2, 1): 0.5, (3, 2): 0.5}),
         ]
     )
     ax, anim = _animate(times, occ, gamma)
     w0, w1 = viz._EDGE_WIDTH_RANGE
-    # the pbc bond list for L = 4 is [(0, 3), (1, 0), (2, 1), (3, 2)]; only the
-    # imaginary entry gamma_01 = 0.25i carries current in frame 0: bond (1, 0)
-    # sees j = 2 Im gamma_10 = -0.5. Frame 0's own max |j| would be 0.5 -> full
-    # width; the trajectory max is 1.0, so that bond sits strictly below it.
+    lo, hi = viz._ARROW_SCALE_RANGE
+    # frame 0: bond (1, 0) [list index 1] has e = 0.5, j = 0.5. The
+    # trajectory-wide energy max is 1.0 (frame 2), so its width sits at the
+    # midpoint; a per-frame normalization would put it at full width w1.
     assert ax.lines[1].get_linewidth() == pytest.approx(w0 + (w1 - w0) * 0.5)
-    for line in (ax.lines[0], ax.lines[2], ax.lines[3]):  # zero-current bonds
-        assert line.get_linewidth() == pytest.approx(w0)
-        assert matplotlib_color(line.get_color()) == pytest.approx(
+    for idx in (0, 2, 3):  # zero-energy bonds: min width, colormap center
+        assert ax.lines[idx].get_linewidth() == pytest.approx(w0)
+        assert matplotlib_color(ax.lines[idx].get_color()) == pytest.approx(
             matplotlib_color(plt.cm.coolwarm(0.5)), abs=1e-12
         )
-    del anim
+    # arrowheads: the trajectory current max is 0.5 (frame 0 only), so
+    # bond 1 shows a full-size forward arrow and the rest stay hidden
+    assert [patch.get_visible() for patch in ax.patches] == [False, True, False, False]
+    assert ax.patches[1].get_mutation_scale() == pytest.approx(hi)
+    xy = viz.lattice_geometry(4)
+    tail, head = ax.patches[1]._posA_posB  # matplotlib-internal, test-only probe
+    # positive j on the directed bond (1, 0): tail nearer site 1, head nearer 0
+    assert np.linalg.norm(tail - xy[1]) < np.linalg.norm(tail - xy[0])
+    assert np.linalg.norm(head - xy[0]) < np.linalg.norm(head - xy[1])
+    # step to the last frame through the real animation callback
+    anim._func(2)
+    assert [line.get_linewidth() for line in ax.lines][0] == pytest.approx(w1)
+    assert ax.lines[0].get_color() != "0.65"  # signed e = +1.0 colors warm
+    assert not any(patch.get_visible() for patch in ax.patches)  # frame 2: j = 0
     plt.close("all")
 
 
@@ -267,8 +331,8 @@ def test_animate_coherence_mode_encodes_magnitude():
     occ = np.full((2, 4), 0.5)
     gamma = np.array(
         [
-            _hermitian_gamma(4, {(0, 1): 0.4, (1, 2): 0.1, (2, 3): 0.2, (3, 0): -0.4}),
-            _hermitian_gamma(4, {(0, 1): 0.4, (1, 2): 0.1, (2, 3): 0.2, (3, 0): -0.4}),
+            _gamma_from_bond_values(4, {(0, 1): 0.4, (1, 2): 0.1, (2, 3): 0.2, (3, 0): -0.4}),
+            _gamma_from_bond_values(4, {(0, 1): 0.4, (1, 2): 0.1, (2, 3): 0.2, (3, 0): -0.4}),
         ]
     )
     ax, anim = _animate(times, occ, gamma, edge_mode="coherence")
@@ -276,7 +340,8 @@ def test_animate_coherence_mode_encodes_magnitude():
     # bond order is [(0,3), (1,0), (2,1), (3,2)] -> |gamma| = [0.4, 0.4, 0.1, 0.2]
     assert widths[2] < widths[3] < widths[0]
     assert widths[1] == pytest.approx(widths[0])
-    del anim
+    # real-valued gamma entries: coherence shows, arrows must stay hidden
+    assert not any(patch.get_visible() for patch in ax.patches)
     plt.close("all")
 
 
@@ -297,8 +362,8 @@ def test_animate_doublon_overlay_area_monotonic():
 def test_animate_saved_output_is_deterministic(tmp_path):
     times = np.linspace(0.0, 1.0, 4)
     occ = np.array([[1.0, 0.0, 0.5, 0.5]] * 4).T * np.array([1.0, 0.8, 0.6, 0.4])[:, None]
-    rng_gamma = _hermitian_gamma(4, {(0, 1): 0.3, (1, 2): -0.1, (2, 3): 0.2, (3, 0): 0.0})
-    gamma = np.stack([rng_gamma] * 4)
+    gamma0 = _gamma_from_bond_values(4, {(0, 1): 0.3, (1, 2): -0.1, (2, 3): 0.2, (3, 0): 0.0})
+    gamma = np.stack([gamma0] * 4)
 
     def save(path):
         ax = _tiny_axis()
@@ -322,7 +387,30 @@ def test_animate_zero_current_gives_uniform_center_color_everywhere():
     for line in ax.lines:
         assert matplotlib_color(line.get_color()) == pytest.approx(center, abs=1e-12)
         assert line.get_linewidth() == pytest.approx(viz._EDGE_WIDTH_RANGE[0])
-    del anim
+    assert not any(patch.get_visible() for patch in ax.patches)  # no arrows at j = 0
+    plt.close("all")
+
+
+def test_animate_interior_frame_sizes_use_trajectory_bounds():
+    """Node SIZE normalization at a strictly interior, non-constant frame.
+
+    Stepping the real animation callback (``anim._func`` is the stored
+    frame function, a matplotlib-internal but stable attribute) at frame
+    index 1 and reading the artist sizes: a per-frame normalization
+    mutant would map the frame's own [1, 3] range onto the full size
+    range and fail both assertions below.
+    """
+    times = np.array([0.0, 1.0, 2.0])
+    occ = np.array([[4.0, 0.0], [1.0, 3.0], [2.0, 2.0]])  # trajectory range 0..4
+    ax, anim = _animate(times, occ)
+    anim._func(1)
+    sizes = ax.collections[0].get_sizes()
+    lo, hi = viz._NODE_SIZE_RANGE
+    expected = [lo + (hi - lo) * 1.0 / 4.0, lo + (hi - lo) * 3.0 / 4.0]
+    assert np.allclose(sizes, expected)  # trajectory-wide bounds
+    assert not np.allclose(sizes, [lo, hi])  # the per-frame-normalization mutant
+    assert ax.collections[0].get_clim() == (0.0, 4.0)
+    assert ax.get_title() == "t = 1"
     plt.close("all")
 
 
@@ -333,6 +421,8 @@ def test_animate_validation():
         viz.animate_lattice(times, np.ones((3, 2)))
     with pytest.raises(ValueError, match="edge_mode"):
         viz.animate_lattice(times, occ, edge_mode="vibes")
+    with pytest.raises(ValueError, match="arrowhead channel"):
+        viz.animate_lattice(times, occ, edge_mode="current")
     with pytest.raises(ValueError, match="gamma must have shape"):
         viz.animate_lattice(times, occ, np.ones((2, 3, 3, 3), dtype=complex))
     with pytest.raises(ValueError, match="doublons"):

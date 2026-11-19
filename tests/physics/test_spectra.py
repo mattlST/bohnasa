@@ -1,6 +1,7 @@
 """Physics invariants: spectra against analytically known results."""
 
 import numpy as np
+import pytest
 
 import bohnasa
 
@@ -30,6 +31,19 @@ def test_hopping_obc_equals_custom_bond_list():
     a = bohnasa.Hopping(fock, connections="obc").matrix.toarray()
     b = bohnasa.Hopping(fock, connections=[(0, 1), (1, 2), (2, 3)]).matrix.toarray()
     assert np.allclose(a, b)
+
+
+@pytest.mark.parametrize("connections", ["pbc", "obc"])
+def test_hopping_with_raw_ndarray_bond_list_is_bit_equal_to_keyword(connections):
+    """Regression (issue #40): Hopping(connections=<ndarray from bond_pairs>)
+    used to raise on the elementwise ``connections == "pbc"`` comparison; it
+    must now assemble the identical matrix as the string keyword."""
+    N, L = 2, 4
+    fock = bohnasa.FixedNFockSpace(N, L)
+    bond_list = bohnasa.bond_pairs(L, connections)
+    string = bohnasa.Hopping(fock, connections=connections).matrix
+    given = bohnasa.Hopping(fock, connections=bond_list).matrix
+    assert np.array_equal(string.toarray(), given.toarray())
 
 
 def test_hopping_two_particles_bosonic_enhancement():

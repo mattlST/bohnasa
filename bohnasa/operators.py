@@ -2,6 +2,7 @@
 
 import copy
 import numbers
+from collections.abc import Sequence
 
 import numpy as np
 import scipy.sparse as sp
@@ -179,6 +180,64 @@ class Correlator(Operator):
         self.matrix = _pair_matrix(fock, index1, index2)
 
 
+def bond_pairs(
+    L: int,
+    connections: str | np.ndarray | Sequence[Sequence[int]] = "pbc",
+) -> np.ndarray:
+    r"""Directed bond list ``indexPairs[e] = (i, j)`` for an ``L``-site geometry.
+
+    Single source of truth for the bond convention, shared by :class:`Hopping`
+    and :func:`bohnasa.visualization.lattice_bonds` so the Hamiltonian and the
+    drawn lattice can never drift apart. ``"pbc"`` pairs site ``i`` with its
+    left neighbour ``(i - 1) mod L`` and ``"obc"`` with ``i + 1``; both hop
+    directions are added by ``Hopping`` itself (``T + T.T``), so each bond of
+    the geometric ring or chain enters the sum exactly once - except at
+    ``L = 2`` with ``"pbc"``, where the ring's single bond is deliberately
+    counted from both ends (see :class:`Hopping`).
+
+    Parameters
+    ----------
+    L : int
+        Number of lattice sites.
+    connections : {'pbc', 'periodic', 'obc', 'open'} or array-like of shape (*, 2)
+        Bond definition: periodic ring, open chain, or an explicit list of
+        directed site pairs ``(i, j)`` passed through as an integer array.
+
+    Returns
+    -------
+    numpy.ndarray of int, shape (*, 2)
+        The ordered bond list.
+
+    Raises
+    ------
+    ValueError
+        If an explicit bond list is not 2-dimensional with shape ``(*, 2)``.
+
+    Examples
+    --------
+    >>> bond_pairs(3, "pbc")
+    array([[0, 2],
+           [1, 0],
+           [2, 1]])
+    >>> bond_pairs(3, "obc")
+    array([[0, 1],
+           [1, 2]])
+    >>> bond_pairs(2, "pbc").shape
+    (2, 2)
+    """
+    if isinstance(connections, str) and connections in ("pbc", "periodic"):
+        return np.array(list(zip(np.arange(L), np.roll(np.arange(L), 1), strict=True)))
+    if isinstance(connections, str) and connections in ("obc", "open"):
+        return np.array(list(zip(np.arange(L - 1), np.arange(1, L), strict=True)))
+    indexPairs = np.array(connections)
+    if indexPairs.ndim != 2 or indexPairs.shape[1] != 2:
+        raise ValueError(
+            "connections must be 'pbc' (periodic), 'obc' (open) or a 2d array "
+            f"with the shape (*,2), but the shape is {indexPairs.shape}"
+        )
+    return indexPairs
+
+
 class Hopping(Operator):
     """Hopping operator ``sum_(i,j) (c^dag_j c_i + h.c.)`` over connections.
 
@@ -197,12 +256,14 @@ class Hopping(Operator):
 
     Notes
     -----
-    For ``connections="pbc"`` at ``L = 2`` the ring's single bond is counted
-    from both ends, giving hopping amplitude ``2J`` across the dimer. This
-    is the deliberate convention (it keeps the L = 2 ring topologically
-    consistent with the general periodic chain), not a defect - use the
-    :class:`Hamiltonian` builder with an explicit ``one_body`` matrix for a
-    deduplicated bond.
+    The bond list comes from :func:`bond_pairs`, the single builder shared
+    with :mod:`bohnasa.visualization` so geometry and Hamiltonian cannot
+    drift apart. For ``connections="pbc"`` at ``L = 2`` the ring's single
+    bond is counted from both ends, giving hopping amplitude ``2J`` across
+    the dimer. This is the deliberate convention (it keeps the L = 2 ring
+    topologically consistent with the general periodic chain), not a defect -
+    use the :class:`Hamiltonian` builder with an explicit ``one_body``
+    matrix for a deduplicated bond.
 
     Examples
     --------
@@ -216,19 +277,7 @@ class Hopping(Operator):
     def __init__(self, fock, connections="pbc"):
         super().__init__(fock)
         L = self.L
-
-        if connections == "pbc" or connections == "periodic":
-            indexPairs = np.array(list(zip(np.arange(L), np.roll(np.arange(L), 1), strict=True)))
-        elif connections == "obc" or connections == "open":
-            indexPairs = np.array(list(zip(np.arange(L - 1), np.arange(1, L), strict=True)))
-        else:
-            indexPairs = np.array(connections)
-            if indexPairs.ndim != 2 or indexPairs.shape[1] != 2:
-                raise ValueError(
-                    "connections must be 'pbc' (periodic), 'obc' (open) or a 2d array "
-                    f"with the shape (*,2), but the shape is {indexPairs.shape}"
-                )
-
+        indexPairs = bond_pairs(L, connections)
         self.connections = indexPairs
 
         T = sp.csr_matrix((self.dim, self.dim), dtype=float)

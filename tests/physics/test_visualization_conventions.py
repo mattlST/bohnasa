@@ -1,6 +1,6 @@
 """Physics conventions of the visualization layer (issue #40, amended).
 
-Sign conventions are stated in ``bohnasa/visualization.py`` and pinned here
+Sign conventions are stated in ``bohnasa/visualization/__init__.py`` and pinned here
 by derivations and invariants - not value snapshots:
 
 1. uniform (k = 0) plane wave -> zero bond current on every edge;

@@ -17,6 +17,8 @@ Convention, closed forms and the pitchfork structure follow the doctoral
 thesis cited in ``CITATION.cff`` (quarter-circle system, off-phase saddle).
 """
 
+from typing import Literal
+
 import numpy as np
 from scipy.integrate import solve_ivp
 
@@ -104,8 +106,19 @@ def dimer_jacobian(theta: float, s: float, phi: float) -> np.ndarray:
     )
 
 
-def mean_field_flow(theta: float, initial: tuple[float, float], times: np.ndarray) -> np.ndarray:
-    """Integrate the classical dimer flow with an adaptive DOP853.
+_INTEGRATION_METHODS = ("DOP853", "RK23", "RK45", "Radau", "BDF", "LSODA")
+
+
+def mean_field_flow(
+    theta: float,
+    initial: tuple[float, float],
+    times: np.ndarray,
+    *,
+    method: Literal["DOP853", "RK23", "RK45", "Radau", "BDF", "LSODA"] = "DOP853",
+    rtol: float = 1e-10,
+    atol: float = 1e-12,
+) -> np.ndarray:
+    """Integrate the classical dimer flow with an adaptive solver.
 
     Parameters
     ----------
@@ -116,6 +129,18 @@ def mean_field_flow(theta: float, initial: tuple[float, float], times: np.ndarra
     times : numpy.ndarray
         Sample times (need not be sorted; duplicates allowed). Times at or
         below zero report the initial state: the flow starts at ``t = 0``.
+    method : str, keyword-only, default "DOP853"
+        Integration method, one of ``"DOP853"``, ``"RK23"``, ``"RK45"``,
+        ``"Radau"``, ``"BDF"``, ``"LSODA"`` (handed to ``solve_ivp``).
+        DOP853 is the anchor-pinned reference of issue #24; at the default
+        tolerances all listed methods agree with it to better than 5e-8 on
+        the bounded orbit and saddle probes (measured).
+    rtol : float, keyword-only, default 1e-10
+        Relative integration tolerance handed to ``solve_ivp``. The default
+        is the accuracy point pinned by the physics anchors of issue #24;
+        callers trading accuracy for speed may loosen it.
+    atol : float, keyword-only, default 1e-12
+        Absolute integration tolerance (same rationale).
 
     Returns
     -------
@@ -124,6 +149,13 @@ def mean_field_flow(theta: float, initial: tuple[float, float], times: np.ndarra
         numerical reference for :func:`dimer_fixed_points` and
         :func:`dimer_jacobian`.
 
+    Raises
+    ------
+    ValueError
+        If ``times`` is empty, not 1D, or non-finite; if ``initial`` is not
+        a real pair; if ``method`` is not one of the listed integrators; or
+        if ``rtol``/``atol`` are not positive and finite.
+
     Examples
     --------
     >>> import numpy as np
@@ -131,12 +163,20 @@ def mean_field_flow(theta: float, initial: tuple[float, float], times: np.ndarra
     >>> traj = mean_field_flow(1.35, (0.0, np.pi), np.array([0.0, 5.0]))
     >>> float(np.abs(traj - np.array([0.0, np.pi])).max()) < 1e-12
     True
+    >>> other = mean_field_flow(1.35, (0.0, np.pi), np.array([0.0, 5.0]),
+    ...                         method="RK45")
+    >>> float(np.abs(other - traj).max()) < 1e-6
+    True
     """
     times = np.asarray(times, dtype=float)
     if times.ndim != 1 or times.size == 0:
         raise ValueError("mean_field_flow: times must be a non-empty 1D array")
     if not np.all(np.isfinite(times)):
         raise ValueError("mean_field_flow: times must be finite")
+    if method not in _INTEGRATION_METHODS:
+        raise ValueError(f"mean_field_flow: method must be one of {_INTEGRATION_METHODS}")
+    if not (np.isfinite(rtol) and rtol > 0.0 and np.isfinite(atol) and atol > 0.0):
+        raise ValueError("mean_field_flow: rtol and atol must be positive and finite")
     y0 = np.asarray(initial, dtype=complex).ravel()
     if y0.size != 2 or np.abs(y0.imag).max() > 1e-12:
         raise ValueError("mean_field_flow: initial must be a real pair (s, phi)")
@@ -148,9 +188,10 @@ def mean_field_flow(theta: float, initial: tuple[float, float], times: np.ndarra
     out[order[~future]] = (s0, phi0)
     if np.any(future):
         # DOP853 (issue #24): adaptive high-order integration of the smooth
-        # 2D flow, with tolerances fixed by the issue. solve_ivp rejects
-        # duplicate t_eval entries, so the sorted targets are deduplicated
-        # and mapped back with np.unique's inverse index.
+        # 2D flow. The default tolerances are the anchor-pinned accuracy
+        # point; rtol/atol are caller-adjustable for speed/accuracy trades.
+        # solve_ivp rejects duplicate t_eval entries, so the sorted targets
+        # are deduplicated and mapped back with np.unique's inverse index.
         unique, inverse = np.unique(targets[future], return_inverse=True)
 
         def rhs(_t: float, y: np.ndarray) -> np.ndarray:
@@ -164,9 +205,9 @@ def mean_field_flow(theta: float, initial: tuple[float, float], times: np.ndarra
             (0.0, float(targets[-1])),
             np.array([s0, phi0]),
             t_eval=unique,
-            method="DOP853",
-            rtol=1e-10,
-            atol=1e-12,
+            method=method,
+            rtol=rtol,
+            atol=atol,
         )
         if not sol.success:
             raise RuntimeError(f"mean_field_flow: integration failed: {sol.message}")

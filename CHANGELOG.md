@@ -125,7 +125,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   works instead of tripping the elementwise string comparison (pinned by a
   bit-equality regression test, issue #40).
 - `mean_field_flow` (`classical_mean_field`) integrates with
-  `scipy.integrate.solve_ivp` (adaptive DOP853, `rtol=1e-10`, `atol=1e-12`)
+  `scipy.integrate.solve_ivp` (adaptive DOP853 by default; caller-adjustable
+  keyword-only `method`/`rtol`/`atol`, defaults `DOP853`/`1e-10`/`1e-12`)
   instead of a hand-rolled fixed-step RK4 loop; saddle anchor trajectories
   agree with the replaced reference to 9.7e-9, and the ODE-perturbation-slope
   physics anchor tightened from `abs=5e-3` to `abs=5e-4` (measured floor

@@ -61,6 +61,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   fraction), `momentum_distribution`, `pair_correlation` (normal-ordered
   density noise, basis-diagonal by construction), `structure_factor`
   (issue #19).
+- Reusable observable evaluation (`StateObservables`, issue #20): binds a
+  `FixedNFockSpace` once and pre-assembles the `L²` `Correlator` pair
+  matrices into a CSR stack, so `one_body_density_matrix` - and everything
+  routed through it, `orbital_occupations` and `momentum_distribution` -
+  costs one stacked matvec plus `L²` BLAS dots per state instead of `L²`
+  Python-loop matrix constructions per call. Bit-for-bit the module-function
+  results (pinned across several bases including complex-valued states; the
+  #19 physics anchors re-run through the stack path; bounded work pinned by
+  construction/matvec counters, not timing). Module functions keep their
+  one-shot behavior.
 - OTOC scrambling: `SquaredCommutator` evaluates the squared commutator
   ``C(t) = ||[O(t), O]|psi>||^2`` via the vector trick - state propagations
   only, never Liouville-space assembly - with dense-eig and sparse-Krylov

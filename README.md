@@ -29,7 +29,9 @@ growth and Krylov complexity after a quench.
   `orbital_occupations` (Penrose-Onsager condensate fraction),
   `momentum_distribution`, `pair_correlation` (bunching),
   `structure_factor` (`S(0) = 0` on the fixed-N shell, shot-noise `S(k) = 1`
-  for the ideal condensate)
+  for the ideal condensate); `StateObservables(fock)` binds one basis once
+  and evaluates whole trajectories from a pre-assembled `Correlator` stack
+  (one matvec per state, bit-for-bit the module-function results)
 - `SquaredCommutator` — OTOC scrambling growth ``C(t) = ‖[O(t), O]‖²`` by
   the vector trick (state propagations only, never Liouville space; dense
   or Krylov propagation, Floquet driving via `from_propagator`), the

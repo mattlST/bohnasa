@@ -78,6 +78,37 @@ def test_geometry_validation():
         viz.lattice_geometry(3, "twisted")
 
 
+def test_axes_frame_is_proportional_for_collinear_chain(figax):
+    # Regression (maintainer-found): autoscale leaves a degenerate y-band
+    # for the open chain (all sites at y = 0), collapsing the axes box so
+    # no node is visible. draw_lattice now pads both directions from the
+    # larger coordinate span; pin that the frame is non-degenerate for the
+    # collinear geometry and proportional for the ring.
+    fig, ax = figax
+    viz.draw_lattice(
+        ax,
+        viz.lattice_geometry(6, "obc"),
+        connections="obc",
+        node_sizes=np.full(6, 1.0),
+        node_colors=np.full(6, 1.0),
+        edge_widths=np.full(5, 1.0),
+        edge_colors=np.full(5, 0.0),
+        edge_currents=np.full(5, 1.0),
+    )
+    xspan = np.ptp(ax.get_xlim())
+    yspan = np.ptp(ax.get_ylim())
+    assert yspan > 0.15 * xspan  # collinear chain gets a real frame height
+    # every site plus its marker fits inside the drawn limits
+    xy = viz.lattice_geometry(6, "obc")
+    assert ax.get_xlim()[0] < xy[:, 0].min()
+    assert ax.get_xlim()[1] > xy[:, 0].max()
+    assert ax.get_ylim()[0] < 0.0 < ax.get_ylim()[1]
+    ax.clear()
+    viz.draw_lattice(ax, viz.lattice_geometry(6, "pbc"), connections="pbc")
+    xr, yr = np.ptp(ax.get_xlim()), np.ptp(ax.get_ylim())
+    assert 0.8 < xr / yr < 1.6  # ring frame follows the padded data bbox
+
+
 # ---------------------------------------------------------------------------
 # bond current / coherence helpers (validation; physics pinned separately)
 # ---------------------------------------------------------------------------

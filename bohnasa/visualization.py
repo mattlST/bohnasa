@@ -1015,11 +1015,11 @@ def animate_lattice(
         Static system-parameter text block, monospace, top-left over the
         axes (figure coordinates). ``None`` draws nothing.
     legend : str, sequence of str, True, or None, default None
-        Static encoding legend below the header. ``True`` auto-generates
-        the lines from the trajectory-wide normalization bounds actually
-        used by this view (node range, edge norms, current norm, arrow
-        cutoff); a string/sequence is drawn verbatim; ``None``/False draws
-        nothing.
+        Static encoding legend below the header. ``True`` (or the
+        equivalent string ``"auto"``) auto-generates the lines from the
+        trajectory-wide normalization bounds actually used by this view
+        (node range, edge norms, current norm, arrow cutoff); any other
+        string/sequence is drawn verbatim; ``None``/False draws nothing.
     live : sequence of (label, values, format-spec), optional
         Per-frame readout line, bottom-center, monospace. ``values`` is a
         precomputed ``(T,)`` array (one value per frame; a scalar fills

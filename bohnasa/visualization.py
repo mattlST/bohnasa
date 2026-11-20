@@ -493,6 +493,14 @@ class _LatticeArtists:
         self.edge_width_range = edge_width_range
         self.arrow_scale_range = arrow_scale_range
         self.doublons = None
+        # Explicit view limits: autoscale collapses the axes box for
+        # collinear geometries (the open chain has zero y-extent), so pad
+        # both directions from the LARGER coordinate span and every
+        # geometry keeps a proportional frame around its markers.
+        span = max(float(np.ptp(xy[:, 0])), float(np.ptp(xy[:, 1])), 1e-9)
+        pad = 0.12 * span
+        ax.set_xlim(float(xy[:, 0].min()) - pad, float(xy[:, 0].max()) + pad)
+        ax.set_ylim(float(xy[:, 1].min()) - pad, float(xy[:, 1].max()) + pad)
         ax.set_aspect("equal")
         ax.set_axis_off()
 

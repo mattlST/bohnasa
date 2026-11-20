@@ -40,7 +40,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   `examples/ex12_lattice_visualization.py`,
   a current-carrying Gaussian-packet quench (the parity-symmetric Fock
   k=0 protocol of the first revision has vanishing current and would
-  render no arrows).
+  render no arrows), replayable as ring or open chain (`CONN`) at a
+  cheap 13-frame pipeline default or the full 49-frame replay
+  (`BOHNASA_EXAMPLES_SLOW=1`).
 - Generic one-/two-body Hamiltonian builder (`Hamiltonian`): normal-ordered
   `Σ t_ij c†_i c_j + Σ V_ijkl c†_i c†_j c_k c_l` from coefficient arrays
   (`one_body`, `two_body`/`onsite_u`), literal coefficients, only nonzero

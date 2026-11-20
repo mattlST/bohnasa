@@ -9,7 +9,8 @@ exactly, and the arrowheads encode the current ``j_ij = 2 Im gamma_ij``
 pinned by the continuity equation - and (b) reproducible: the annotated
 GIF and PNG frame strip are byte-identical across repeated builds?
 
-Protocol: N = 6 bosons on an L = 6 ring, starting as a Gaussian packet
+Protocol: N = 6 bosons on an L = 6 ring or open chain (switch with ``CONN``
+below), starting as a Gaussian packet
 (width sigma = 1.5 sites around site 0) with winding k0 = 2 pi / 6 - a
 CURRENT-CARRYING quench: parity-symmetric density-only initial states
 (Fock |6,0,...> or the k = 0 plane wave) have gamma real and hence
@@ -22,10 +23,13 @@ below the monochromatic group velocity 2 t sin(k0) = 1.7321 sites/s
 |sin k|), and it spreads as it goes. Nodes pulse with ``<n_i>``, edges
 shade with the bond energy, arrowheads show the current, squares track
 doublons; the header/legend/caption blocks state the norms actually used.
-Exact diagonalization propagates the state (dim = 462, all headless).
+Exact diagonalization propagates the state (dim = 462, all headless). The
+frame count follows the ``BOHNASA_EXAMPLES_SLOW`` profile: 13 frames by
+default (cheap pipeline run), 49 for the full replay.
 """
 
 import hashlib
+import os
 from pathlib import Path
 
 import matplotlib.pyplot as plt
@@ -62,10 +66,16 @@ from bohnasa.visualization import (  # _ARROW_THRESHOLD / _legend_lines are
 
 N, L = 6, 6
 U_HALF = 0.5  # Interaction * 0.5 is the (U/2) n(n-1) term, i.e. U = 1
-N_TIME = 49
+# Pipeline profile: the default samples the same quench coarsely (13
+# frames) so example runs stay cheap in CI; set BOHNASA_EXAMPLES_SLOW=1
+# for the full 49-frame replay. Both profiles are headless and byte-
+# deterministic; every anchor below holds at both frame counts.
+SLOW = os.environ.get("BOHNASA_EXAMPLES_SLOW", "0") == "1"
+N_TIME = 49 if SLOW else 13
+CONN = "pbc"  # "pbc" (ring) or "obc" (open chain) - geometry AND bonds
 
 fock = FixedNFockSpace(N, L)
-hop = Hopping(fock, connections="pbc")
+hop = Hopping(fock, connections=CONN)
 H = hop * (-1.0) + Interaction(fock) * U_HALF
 
 # Gaussian packet with winding k0 = 2 pi / 6 (wrapped distance from site 0)
@@ -129,8 +139,8 @@ assert np.abs(n_i_t[0, 0] - 1.6859) < 1e-4  # packet peak on site 0
 g0 = one_body_density_matrix(psi0, fock)
 assert np.allclose(g0.real.diagonal(), n_i_t[0])
 # the drawn bonds ARE the Hamiltonian's bond list (issue #40 requirement 2)
-np.testing.assert_array_equal(lattice_bonds(L, "pbc"), hop.connections)
-bonds = lattice_bonds(L, "pbc")
+np.testing.assert_array_equal(lattice_bonds(L, CONN), hop.connections)
+bonds = lattice_bonds(L, CONN)
 j_t = np.array([bond_current(g, bonds) for g in gamma_t])
 e_t = np.array([bond_energy(g, bonds) for g in gamma_t])
 assert j_t.dtype == float and e_t.dtype == float
@@ -144,18 +154,20 @@ h_int_t = U_HALF * dbl_t.sum(axis=1)  # <(U/2) sum n(n-1)>
 e_dev = float(np.abs(h_hop_t + h_int_t - (h_hop_t[0] + h_int_t[0])).max())
 assert e_dev < 1e-9, e_dev
 
-# the quench carries current: measured over this protocol the trajectory
-# max |j| is 2.6848..., far above the 5%-of-max no-arrow cutoff 0.1342...
+# the quench carries current: measured trajectory max |j| is 2.6848
+# (pbc) / 2.6129 (obc), far above the 5%-of-max no-arrow cutoff
 j_max = float(np.abs(j_t).max())
 cutoff = _ARROW_THRESHOLD * j_max
 assert j_max > 2.5, j_max
 arrows_visible = np.abs(j_t) > cutoff
 assert np.all(arrows_visible.sum(axis=1) >= 1)  # every frame shows >= 1 arrow
 # packet flux velocity at t = 0 (mean bond current / site density, sites/s):
-# 1.6590 measured, vs the monochromatic 2 t sin(k0) = 1.7321 it approximates.
+# 1.6590 (pbc) / 1.4682 (obc) measured, vs the monochromatic
+# 2 t sin(k0) = 1.7321 it approximates; the open chain loses the periodic
+# bonds and reflects the packet, so its mean current is smaller.
 v0 = float(L * j_t[0].mean() / N)
 v_mono = 2.0 * 1.0 * np.sin(k0)
-assert 1.5 < abs(v0) < v_mono, (v0, v_mono)
+assert 1.4 < abs(v0) < v_mono, (v0, v_mono)
 mid = N_TIME // 2
 assert np.abs(np.real(np.diag(gamma_t[mid])) - n_i_t[mid]).max() < 1e-10
 # the momentum-operator means equal the FFT of the measured gamma (same
@@ -178,8 +190,9 @@ node_bounds = (float(n_i_t.min()), float(n_i_t.max()))
 edge_bounds = (-e_max, e_max)  # symmetric: zero bond energy is the color center
 
 # annotation blocks (all deterministic: simulated data only, no wall clock)
+_GEOM = "ring " if CONN == "pbc" else "chain"
 header_lines = [
-    f"Bose-Hubbard ring   L={L}  N={N}  nu=N/L={N / L:.1f}  pbc",
+    f"Bose-Hubbard {_GEOM}  L={L}  N={N}  nu=N/L={N / L:.1f}  {CONN}",
     f"t_hop = 1.0   U/t = {2 * U_HALF:.1f}   init: Gaussian packet k0=2pi/6 sigma={SIGMA:.1f}",
     f"evolution: t in [0, {times[-1]:g}], {N_TIME} frames   "
     f"arrow cutoff: {_ARROW_THRESHOLD:.0%} of max|j| = {cutoff:.3f}",
@@ -196,8 +209,8 @@ live_fields = [
 ]
 
 out_dir = Path(__file__).resolve().parent
-xy = lattice_geometry(L, "pbc")
-strip_frames = [0, 10, 20, 29, 38, 48]
+xy = lattice_geometry(L, CONN)
+strip_frames = [round(k * (N_TIME - 1) / 5) for k in range(6)]  # six evenly spread
 
 
 def build_strip(path: Path) -> str:
@@ -208,6 +221,7 @@ def build_strip(path: Path) -> str:
         draw_lattice(
             ax,
             xy,
+            connections=CONN,
             node_sizes=n_i_t[frame],
             node_colors=n_i_t[frame],
             edge_widths=e_t[frame],
@@ -254,6 +268,7 @@ def build_gif(path: Path) -> str:
         n_i_t,
         gamma_t,
         doublons=dbl_t,
+        connections=CONN,
         header=header_lines,
         legend=legend_lines_gif,
         live=live_fields,

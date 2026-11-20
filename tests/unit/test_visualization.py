@@ -768,6 +768,69 @@ def test_animate_auto_legend_states_the_norms_used():
     plt.close("all")
 
 
+def test_animate_legend_auto_string_is_the_true_alias():
+    """Issue #47 pin: legend="auto" is the spelled-out form of True.
+
+    The code branch ``legend is True or legend == "auto"`` accepted the
+    string without documentation or a test (surviving #40 mutant M-A1).
+    Dropping the alias makes the string fall through to the verbatim
+    branch - the texts of the two views then differ, and the expected
+    lines below are the auto-generated ones, not the word "auto";
+    mapping the alias to a silent no-op fails the first equality too.
+    """
+    times = np.array([0.0, 1.0])
+    occ = np.array([[0.0, 2.0], [1.0, 1.0]])
+    gamma = np.array(
+        [
+            _gamma_from_bond_values(2, {(0, 1): 0.5 + 0.25j}),
+            _gamma_from_bond_values(2, {(0, 1): 0.2 + 0.1j}),
+        ]
+    )
+    dbl = np.array([[1.0, 0.0], [0.0, 1.0]])
+
+    def legend_lines(legend):
+        ax, _ = _animate(times, occ, gamma, doublons=dbl, legend=legend)
+        text = ax.figure.texts[0].get_text()
+        plt.close("all")
+        return text.splitlines()
+
+    auto_lines = legend_lines("auto")
+    # same data, same norms -> the alias must reproduce legend=True
+    assert auto_lines == legend_lines(True)
+    assert auto_lines == [
+        "node area propto <n_i> in [0.00, 2.00]   edge width+color propto 2Re g_ij (-1.00..+1.00)",
+        "arrows propto j_ij = 2Im g_ij (+-0.50)   no arrow |j| <= 0.025"
+        "   squares: doublons n_i(n_i-1)",
+    ]
+
+
+def test_animate_live_scalar_fills_every_frame():
+    """Issue #47 pin: a scalar live value fills all frames (#40 promise).
+
+    Constant metadata like ``U/t`` may be passed as a bare number;
+    ``_validate_live`` expands it to ``(T,)``. Without the ndim-0 fill the
+    shape check raises at build time, and a fill with the wrong constant
+    changes the rendered line. Both the frame-0 text (applied inside
+    ``animate_lattice``) and the strictly interior frames 1 and 2 are
+    probed through the real animation callback ``anim._func`` (as in the
+    #40 interior-frame test); the per-frame ``t`` field in the same line
+    proves the text really is recomputed, so a frozen or dropped
+    ``set_text`` cannot pass.
+    """
+    times = np.array([0.0, 1.0, 2.0, 3.0])
+    occ = np.array([[1.0, 1.0], [0.5, 1.5], [0.75, 1.25], [1.5, 0.5]])
+    ax, anim = _animate(times, occ, live=[("t", times, "4.1f"), ("U/t", 2.5, "+.2f")])
+    assert len(ax.figure.texts) == 1  # only the live readout carries text
+    live = ax.figure.texts[0]
+    assert live.get_text() == "t =  0.0   U/t = +2.50"  # frame 0 at build
+    for k, expected in ((1, "t =  1.0   U/t = +2.50"), (2, "t =  2.0   U/t = +2.50")):
+        anim._func(k)
+        assert live.get_text() == expected  # scalar part identical, t part moved
+    anim._func(3)
+    assert live.get_text() == "t =  3.0   U/t = +2.50"  # last frame still filled
+    plt.close("all")
+
+
 def test_annotated_gif_is_deterministic_and_text_affects_pixels(tmp_path):
     times = np.linspace(0.0, 1.0, 3)
     occ = np.tile([1.0, 0.5, 1.0, 0.5], (3, 1))

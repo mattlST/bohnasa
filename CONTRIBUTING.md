@@ -52,6 +52,27 @@ Blocking on Python 3.10–3.13: `ruff` lint + format, `mypy` on the public API,
 pytest with doctests and a 90% coverage floor, and a headless smoke run of
 every script in `examples/`.
 
+### Reproducing CI locally
+
+The py3.10 arm is the one people reproduce by hand. Use the checked-in
+recipe instead of ad-hoc container commands:
+
+    ci/repro_arm310.sh              # or: ci/repro_arm310.sh <ref>
+
+It exports the ref with `git archive` (never mount a working tree — untracked
+files, a local venv, or a leftover `build/` change what the gates see) and
+builds `ci/arm310.Dockerfile` from that clean export, which installs the
+package **editable**: `pip install -e ".[dev,examples]"`.
+
+Two failure signatures mean the reproduction went wrong, not the code (a
+plain, non-editable `pip install .` produces exactly these 11+11 errors —
+see `ci/arm310.Dockerfile`):
+
+- `ruff check .`: 11 F403 star-import errors on `build/lib/bohnasa/__init__.py`
+  (the per-file-ignore covers only the real `bohnasa/__init__.py`);
+- `pytest --doctest-modules bohnasa/ tests/`: 11 "import file mismatch"
+  collection errors (site-packages shadows the source tree).
+
 ## Larger ideas first
 
 New physics modules (symmetry sectors, new algorithms) start with an issue for

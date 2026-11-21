@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- Kicked (Floquet) Bose-Hubbard ring (`bohnasa.kicked`, issue #29):
+  `KickedBoseHubbard(L, tau, J, U)` builds the two-factor drive step
+  `U_step = exp(-i tau H_J) exp(-i tau H_U)` from `Hopping`/`Interaction`
+  (kick-then-hop order and bond conventions stated once in the module
+  docstring, factor order pinned against the ex10-style hand assembly), feeds
+  `SquaredCommutator.from_propagator` for Floquet OTOC curves, exposes
+  `floquet_spectrum(fock)` returning quasienergies in the stated half-open
+  band `[0, 2 pi / tau)` with Floquet modes - symmetry-sector blocked via
+  `SymmetrySectors` for named boundary conditions (measured 4.6-5.5 s vs
+  39-200 s for the dense fallback at dim 3003) - and `classical_map()`
+  returning the classical kicked map `KickedMeanFieldMap` (kick-the-phases /
+  linear-hop Gross-Pitaevskii map with `iterate` and a pinned dimer
+  `(s, phi)` dictionary). Validated: unitarity at roundoff across regimes
+  (strong-kick corner included, max |U^dag U - I| = 1.11e-15), the tau -> 0
+  limit of the map reproducing `mean_field_flow` with measured first-order
+  Trotter convergence (Richardson ratios 1.965/1.982 in `s`, 1.9992/1.9992
+  in `phi`), the `from_propagator` round trip against explicit Heisenberg
+  matrix powers (max dev 2.5e-14), and branch-convention determinism
+  (bitwise reproducible spectra; tau-perturbation shift 9.5e-9 vs a measured
+  0.35 gap to the zone edge). Illustrated by
+  `examples/ex13_kicked_ring.py` (quasienergy branches vs U, Floquet OTOC
+  vs continuous time, kicked density propagation, classical map orbits).
 - Numerical settings policy (issue #25): every numeric knob in `bohnasa/*.py`
   is a named module constant whose comment states the measured regime it
   protects (Lanczos breakdown and reorthogonalization tolerances, OTOC

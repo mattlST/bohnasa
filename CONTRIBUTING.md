@@ -46,6 +46,69 @@ Rules of the road:
 - The change satisfies CODING_RULES.md; if it deliberately breaks a rule, say why in
   the PR body (rule changes are discussed as openly as code).
 
+## Numerical settings policy
+
+Every numeric *setting* in `bohnasa/*.py` - tolerance, threshold, block size,
+iteration cap, solver default, determinism seed - is a named module-level
+constant whose comment states the measured regime it protects (issue #25).
+Bare literals remain only for structural and mathematical quantities (indices,
+shape algebra, exact coefficients of documented closed forms like the dimer
+`mu^2 = 8 cos^2(theta) (tan(theta) - 2)`). Retuning a constant never needs a
+code-structure change, but it must cite a measurement: rerun
+`benchmarks/propagation_scaling.py` (or the probe named in the comment) and
+update the comment in the same commit. The constants fall into two classes:
+
+**(a) Tested invariants** - changing the value flips a pinned test or doctest;
+a change is only acceptable together with the corresponding test update:
+
+- `classical_mean_field._DEFAULT_RTOL` / `._DEFAULT_ATOL` - the issue #24
+  anchor point (`tests/unit/test_mean_field_flow.py` method-agreement and
+  rtol-ladder margins; `tests/physics/test_otoc_physics.py` 3.34e-4 slope floor).
+- `classical_mean_field._REAL_INPUT_TOL`, `mean_field_lattice._STATE_IMAG_TOL`
+  - the `1e-3j` rejection in `tests/unit/test_otoc.py::test_mean_field_flow_rejects_complex_initial`
+  and the state-validation tests bracket this value.
+- `classical_mean_field._ROOT_FLOOR` - wall guard; bounded-orbit anchors are
+  bit-identical with and without it (measured orbit-wall margin >= 5.5e-2).
+- `mean_field_lattice._DEFAULT_SOLVER_RTOL` / `._DEFAULT_SOLVER_ATOL` -
+  trajectory energy-drift doctest bound and the four-digit Lyapunov doctests.
+- `mean_field_lattice._SEED_LARGE_L_SIGNS` / `._SEED_FP_SHELL` /
+  `._SEED_LYAPUNOV_V0` - determinism test plus the `fixed_points` /
+  `lyapunov` doctest outputs track these exact RNG streams.
+- `mean_field_lattice._DEFAULT_FP_TOL` / `._ROOT_XTOL` / `._FP_DEDUP_TOL` /
+  `._FP_SHELL_TOL` - they gate which roots enter the found-point set pinned
+  by the `fixed_points` doctests and `tests/unit/test_mean_field_lattice.py`;
+  each sits in a measured gap between accepted and rejected populations.
+- `krylov._LANCZOS_BETA_TOL`, `krylov.REORTH_REL_TOL`, `krylov.REORTH_ABS_TOL`
+  - inside measured population gaps (breakdown <= 3.8e-13 < tol < true
+  couplings >= 7.1e-4; reorth plateau ~1.3e-13 * ||op||); moving them outside
+  a gap changes chain depths or trips the staggered-coherent regression case.
+- `otoc._DENSE_EIG_LIMIT` - also class (b) by intent, but the auto-dispatch is
+  pinned at dim 2001/3003 by `tests/unit/test_otoc.py`, so retuning requires
+  updating that test in the same commit.
+- `sectors._MIRROR_PHASE_TOL` - sits between measured round-off (<= 1.4e-13)
+  and the smallest true phase mismatch (2.8e-1); the isometry and
+  projector-completeness tests in `tests/unit/test_sectors.py` pin sectors.
+
+**(b) Performance hints** - free to retune per host with a fresh benchmark
+citation in the constant's comment, no test update needed:
+
+- `otoc._SPECTRAL_BLOCK` - measured flat 8.0-8.6 s for blocks 128..4096
+  (dim 2925, 4096-time curve): a memory ceiling, not a throughput knob.
+- `krylov.MAX_REORTH_ITERATIONS` - pure safety cap, ~20x above the measured
+  1-pass convergence.
+- `mean_field_lattice._DEFAULT_LYAPUNOV_DELTA` - exponent invariant over
+  delta in [1e-4, 1e-12] (measured identical to 8 digits).
+- `mean_field_lattice._DEFAULT_FP_N_RANDOM`,
+  `mean_field_lattice._MAX_EXACT_SEED_PATTERNS`, `mean_field_lattice._ROOT_MAXFEV`
+  - coverage/runtime trade-offs of the heuristic fixed-point search (the found
+  set grows with them; no doctest at L >= 3 pins completeness).
+
+No environment-variable overrides (issue #25 decision): no tuning use case
+has appeared, module constants are already importable and monkeypatchable in
+tests, and an override channel would invite values outside the measured
+regimes above. Revisit when a host is reported where the default regimes do
+not transfer.
+
 ## CI gates
 
 Blocking on Python 3.10–3.13: `ruff` lint + format, `mypy` on the public API,

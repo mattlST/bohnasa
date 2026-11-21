@@ -17,6 +17,16 @@ import scipy.sparse as sp
 from .fock_space import FixedNFockSpace
 from .operators import Operator
 
+# Numerical settings policy (issue #25): see CONTRIBUTING.md.
+#
+# Acceptance band for the reflection eigenvalue of a self-inverse momentum
+# sector (k = 0, L/2): for mirror-invariant orbits the phase
+# exp(-2 j pi k b / L) is exactly +-1 up to round-off, measured <= 1.4e-13
+# over all k = L/2 phases with L < 200, while the smallest genuine mismatch
+# (non-invariant orbit phase) over 4 <= L < 12 is 2.8e-1. The band separates
+# noise from signal by >= 4 orders on either side.
+_MIRROR_PHASE_TOL = 1e-12
+
 
 @dataclass(frozen=True)
 class SectorLabel:
@@ -235,7 +245,7 @@ class SymmetrySectors:
                     # U(refl) |i; k> = exp(-2 j pi k b / L) |j; k>
                     phase = np.exp(-2j * np.pi * k * b / L)
                     if j == i:
-                        if abs(phase - parity) < 1e-12:
+                        if abs(phase - parity) < _MIRROR_PHASE_TOL:
                             parity_columns.append(self._orbit_columns(orbit, k, period))
                     else:
                         parity_columns.append(

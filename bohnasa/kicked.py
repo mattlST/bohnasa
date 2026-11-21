@@ -42,8 +42,10 @@ varphi_j)`` (``i dalpha_j/dt = dH_MF/dalpha*_j``, canonical bracket
     A = -J * (M + M^T),  M[j, i] = 1 for each directed bond (i, j),
 
 the normal-ordered quantum energy read out literally except for the ``-1`` in
-``n (n - 1)``, which multiplies every amplitude by the same ``exp(+i tau U)``
-per kick and is invisible in all relative phases and occupations (the gauge is
+``n (n - 1)``, which multiplies every configuration amplitude by the same
+``exp(+i tau U / 2)`` per boson - ``exp(+i tau U N / 2)`` per kick for the
+whole state, and exactly ``exp(+i tau U)`` only at N = 2 - and is invisible
+in all relative phases and occupations (the gauge is
 pinned by dropping it; ``iterate`` reports the resulting phase convention).
 The map is the same kick-then-hop Lie-Trotter split as the quantum step: kick
 ``alpha_j -> exp(-i tau U n_j) alpha_j``, then hop ``alpha -> exp(-i tau A)

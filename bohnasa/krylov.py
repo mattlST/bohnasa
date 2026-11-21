@@ -9,12 +9,39 @@ from . import operators
 
 logger = logging.getLogger(__name__)
 
+# Policy: every numeric setting below is a module constant with its measured
+# regime (issue #25); retuning one is a performance change needing a new
+# measurement - see CONTRIBUTING.md "Numerical settings policy".
+#
+# Happy-breakdown cutoff for the Lanczos recursion. Measured on this host:
+# exhausted-Krylov betas come out <= 3.8e-13 (random seeds, fixed-N pbc rings
+# at dim 45/66), while the smallest genuine coupling found in the test chains
+# is 7.1e-4 (N = 6, L = 3 at U = 200, ||op|| = 6e3); 1e-8 separates the two
+# populations by >= 3 orders of magnitude on either side for O(1)-scale
+# generators. tests/physics/test_lanczos.py passes 1e-5 explicitly where a
+# shallower cutoff must hold.
+_LANCZOS_BETA_TOL = 1e-8
+# Safety cap on iterative reorthogonalization passes, not a tuned threshold:
+# every pass measured in the suite converges on the 1st iteration, and the
+# per-pass change of w plateaus at ~1.3e-13 * ||op|| (deliberately
+# contaminated vector, U = 200 chain), so 20 is pure headroom before the
+# RuntimeError rather than a regime boundary.
 MAX_REORTH_ITERATIONS = 20
+# A reorthogonalization pass is accepted when it changes w by less than
+# REORTH_REL_TOL * ||w|| + REORTH_ABS_TOL. The relative part sits ~3 orders
+# above the measured plateau floor (1.3e-13 * ||op||); a purely absolute
+# threshold is unreachable once ||op|| lifts the noise floor (plateau 7.6e-10
+# absolute at ||op|| = 6e3). That case - the large-scale origin of this norm-
+# relative form - is pinned by
+# tests/physics/test_lanczos.py::test_lanczos_full_depth_staggered_coherent_reproduces_spectrum.
 REORTH_REL_TOL = 1e-10
+# Absolute floor of the combined criterion, so a pass stays decidable while
+# ||w|| is at the breakdown noise (measured exhausted-chain betas 3.8e-13 to
+# 6.4e-14: the relative term alone would demand float64-impossible precision).
 REORTH_ABS_TOL = 1e-12
 
 
-def lanczos(sta, op, krylov_dim, beta_tol=1e-8):
+def lanczos(sta, op, krylov_dim, beta_tol=_LANCZOS_BETA_TOL):
     """Lanczos recursion with full reorthogonalization.
 
     Builds an orthonormal Krylov basis by repeated action of ``op`` on

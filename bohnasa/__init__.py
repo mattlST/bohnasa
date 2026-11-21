@@ -1,5 +1,6 @@
 from .classical_mean_field import *
 from .fock_space import *
+from .kicked import *
 from .krylov import *
 from .mean_field_lattice import *
 from .observables import *

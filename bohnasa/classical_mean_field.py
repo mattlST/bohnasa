@@ -29,13 +29,40 @@ __all__ = [
     "mean_field_flow",
 ]
 
+# Numerical settings policy (issue #25): every knob is a named constant with
+# its measured regime; see CONTRIBUTING.md "Numerical settings policy".
+#
+# sqrt guard for the flow and the Jacobian. In float64 the clip is active
+# only at |s| == 1 exactly (the nearest interior double gives 1 - s*s =
+# 2.2e-16, far above the floor); it turns the wall singularity from inf into
+# a finite but astronomically stiff value (measured dphi = 7.7e149 at
+# s = 1, phi = 0.5 vs inf without it). Real bounded orbits stay away from the
+# wall by >= 5.5e-2 (measured s0 = 0.9 orbit over t in [0, 20]), so the floor
+# never perturbs the physics anchors.
+_ROOT_FLOOR = 1e-300
+# Default solve_ivp tolerances: the accuracy point the issue #24 anchors were
+# measured at. Pinned references: cross-method agreement <= 6.2e-8 and the
+# monotone rtol-ladder deviations 4.22e-9 ... 4.78e-3
+# (tests/unit/test_mean_field_flow.py), and the ODE-perturbation-slope floor
+# 3.34e-4, bit-identical across the CI scipy matrix
+# (tests/physics/test_otoc_physics.py). Loosen both only with a re-measured
+# anchor; they are caller-adjustable keyword arguments for speed/accuracy
+# trades.
+_DEFAULT_RTOL = 1e-10
+_DEFAULT_ATOL = 1e-12
+# Realness tolerance for the initial pair (s, phi): accepts complex input
+# carrying only round-off imaginary parts (measured <= 2.8e-17 for FFT
+# round-trips) and rejects physical-scale ones; a 1e-3j initial is pinned
+# invalid by tests/unit/test_otoc.py::test_mean_field_flow_rejects_complex_initial.
+_REAL_INPUT_TOL = 1e-12
+
 
 def _mf_fields(s: float, phi: float, theta: float) -> tuple[float, float]:
     """Right-hand side of the dimer flow ds = -2 dh/dphi, dphi = +2 dh/ds
     for h(s, phi) = -2 cos(theta) sqrt(1-s^2) cos(phi)
     + (sin(theta)/2) (1+s^2)."""
     c, u = np.cos(theta), np.sin(theta)
-    root = np.sqrt(np.clip(1.0 - s * s, 1e-300, None))
+    root = np.sqrt(np.clip(1.0 - s * s, _ROOT_FLOOR, None))
     ds = -4.0 * c * root * np.sin(phi)
     dphi = 4.0 * c * s * np.cos(phi) / root + 2.0 * u * s
     return ds, dphi
@@ -94,7 +121,7 @@ def dimer_jacobian(theta: float, s: float, phi: float) -> np.ndarray:
     0.0
     """
     c, u = np.cos(theta), np.sin(theta)
-    root = np.sqrt(max(1.0 - s * s, 1e-300))
+    root = np.sqrt(max(1.0 - s * s, _ROOT_FLOOR))
     return np.array(
         [
             [4.0 * c * s * np.sin(phi) / root, -4.0 * c * root * np.cos(phi)],
@@ -115,8 +142,8 @@ def mean_field_flow(
     times: np.ndarray,
     *,
     method: Literal["DOP853", "RK23", "RK45", "Radau", "BDF", "LSODA"] = "DOP853",
-    rtol: float = 1e-10,
-    atol: float = 1e-12,
+    rtol: float = _DEFAULT_RTOL,
+    atol: float = _DEFAULT_ATOL,
 ) -> np.ndarray:
     """Integrate the classical dimer flow with an adaptive solver.
 
@@ -178,7 +205,7 @@ def mean_field_flow(
     if not (np.isfinite(rtol) and rtol > 0.0 and np.isfinite(atol) and atol > 0.0):
         raise ValueError("mean_field_flow: rtol and atol must be positive and finite")
     y0 = np.asarray(initial, dtype=complex).ravel()
-    if y0.size != 2 or np.abs(y0.imag).max() > 1e-12:
+    if y0.size != 2 or np.abs(y0.imag).max() > _REAL_INPUT_TOL:
         raise ValueError("mean_field_flow: initial must be a real pair (s, phi)")
     s0, phi0 = float(y0[0].real), float(y0[1].real)
     order = np.argsort(times)

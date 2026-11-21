@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- Numerical settings policy (issue #25): every numeric knob in `bohnasa/*.py`
+  is a named module constant whose comment states the measured regime it
+  protects (Lanczos breakdown and reorthogonalization tolerances, OTOC
+  dispatch threshold and spectral block size, mean-field solver defaults,
+  fixed-point search gates, determinism seeds, symmetry phase tolerance);
+  CONTRIBUTING.md separates tested invariants from performance hints, and
+  `benchmarks/propagation_scaling.py` records the propagation-mode cost
+  curves the threshold comments cite. Value-identical naming only - no
+  behavior changes.
 - Time-resolved lattice visualization (`bohnasa.visualization`): ring/chain
   geometry (`lattice_geometry`, `lattice_bonds`) sharing one bond-list builder
   with `Hopping` (`operators.bond_pairs`, including the deliberate `L = 2` PBC

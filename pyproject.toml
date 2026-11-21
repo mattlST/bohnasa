@@ -41,6 +41,8 @@ select = ["E", "F", "I", "UP", "B", "T"]
 "bohnasa/__init__.py" = ["F401", "F403"]
 # demo scripts print on purpose
 "examples/*.py" = ["T201"]
+# benchmark scripts print their measurement tables on purpose
+"benchmarks/*.py" = ["T201"]
 
 [tool.mypy]
 python_version = "3.10"

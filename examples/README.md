@@ -18,6 +18,7 @@ question, ends with self-check assertions, and is smoke-tested headless in CI
 | `ex10_kicked_dimer.py` | Trotterized dimer driving: small periods regain the continuous curve, larger ones weaken the growth rate |
 | `ex11_mean_field_lattice.py` | general L-site mean-field DNLS engine: exact L=2 dimer reduction, L=4 fixed-point branches, three-way Lyapunov cross-check |
 | `ex12_lattice_visualization.py` | the geometric view: L=6 ring quench of a current-carrying winding Gaussian packet — pulsing node sizes, bond-energy-colored edges with prominent current arrowheads, header/legend/live captions, one shared colorbar pair (headless GIF + frame strip, byte-deterministic), occupation/momentum heatmaps |
+| `ex13_kicked_ring.py` | kicked Bose-Hubbard ring: blocked Floquet quasienergy branches vs U, Floquet OTOC against the continuous-time curve, kicked density propagation, classical kicked-map orbits (all issue #29 validations run as guards) |
 
 Run:
 

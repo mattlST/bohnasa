@@ -35,9 +35,12 @@ __all__ = ["SquaredCommutator"]
 # Auto-dispatch threshold for the dense eigensolve fallback. It bounds the
 # one-shot O(dim^3) LAPACK cost, measured on the non-tridiagonal 2-particle
 # chain (16-core host, fresh process per point; benchmarks/propagation_scaling.py
-# reproduces the shape, a warm single process runs somewhat higher):
-# eigensolve 0.18 s at dim 861, 2.5 s at 1770, 5.0 s at 2080, 16.6 s at
-# 2926; peak RSS ~340-780 MB where the krylov path stays under 150 MB.
+# reproduces the shape; the ABSOLUTES below are load- and BLAS-threading
+# dependent - an independent idle single-thread rerun reproduced the cubic
+# scaling (fit exponent 2.82-2.91) at 2-5x lower times (RSS 262 MB at 2080),
+# while contention pushes them higher; trust the shape, retune absolutes per
+# host): eigensolve 0.18 s at dim 861, 2.5 s at 1770, 5.0 s at 2080, 16.6 s
+# at 2926. The krylov path stays under 150 MB.
 # The STEMR path is exempt at any size - for width-1 Hamiltonians the full
 # eigendecomposition is O(dim^2). Below the limit the eigensolve amortizes
 # over the curve: a 2001-point curve costs 0.3 s, vs 13.4 s for per-point

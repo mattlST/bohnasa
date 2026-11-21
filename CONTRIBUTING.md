@@ -67,13 +67,16 @@ a change is only acceptable together with the corresponding test update:
 - `classical_mean_field._REAL_INPUT_TOL`, `mean_field_lattice._STATE_IMAG_TOL`
   - the `1e-3j` rejection in `tests/unit/test_otoc.py::test_mean_field_flow_rejects_complex_initial`
   and the state-validation tests bracket this value.
-- `classical_mean_field._ROOT_FLOOR` - wall guard; bounded-orbit anchors are
-  bit-identical with and without it (measured orbit-wall margin >= 5.5e-2).
+- `classical_mean_field._ROOT_FLOOR` - wall guard, provably inactive away
+  from |s| = 1 exactly; measured bounded-orbit margin to the wall is
+  >= 5.5e-2, so the physics anchors are bit-identical with and without it.
 - `mean_field_lattice._DEFAULT_SOLVER_RTOL` / `._DEFAULT_SOLVER_ATOL` -
   trajectory energy-drift doctest bound and the four-digit Lyapunov doctests.
-- `mean_field_lattice._SEED_LARGE_L_SIGNS` / `._SEED_FP_SHELL` /
-  `._SEED_LYAPUNOV_V0` - determinism test plus the `fixed_points` /
-  `lyapunov` doctest outputs track these exact RNG streams.
+- `mean_field_lattice._SEED_FP_SHELL` / `._SEED_LYAPUNOV_V0` - the
+  `fixed_points` doctest shape (L = 2) and the four-digit `lyapunov` doctests
+  track these exact streams; `._SEED_LARGE_L_SIGNS` deterministically drives
+  the sparse-sign branch exercised by
+  `tests/unit/test_mean_field_lattice.py::test_fixed_points_sparse_sign_seeds_for_large_l`.
 - `mean_field_lattice._DEFAULT_FP_TOL` / `._ROOT_XTOL` / `._FP_DEDUP_TOL` /
   `._FP_SHELL_TOL` - they gate which roots enter the found-point set pinned
   by the `fixed_points` doctests and `tests/unit/test_mean_field_lattice.py`;
@@ -82,9 +85,10 @@ a change is only acceptable together with the corresponding test update:
   - inside measured population gaps (breakdown <= 3.8e-13 < tol < true
   couplings >= 7.1e-4; reorth plateau ~1.3e-13 * ||op||); moving them outside
   a gap changes chain depths or trips the staggered-coherent regression case.
-- `otoc._DENSE_EIG_LIMIT` - also class (b) by intent, but the auto-dispatch is
-  pinned at dim 2001/3003 by `tests/unit/test_otoc.py`, so retuning requires
-  updating that test in the same commit.
+- `otoc._DENSE_EIG_LIMIT` - also class (b) by intent, but
+  `tests/unit/test_otoc.py` pins a dim-3003 non-tridiagonal Hamiltonian to
+  the krylov path (limit < 3003) and the dim-2001 tridiagonal STEMR
+  exemption, so retuning requires updating that test in the same commit.
 - `sectors._MIRROR_PHASE_TOL` - sits between measured round-off (<= 1.4e-13)
   and the smallest true phase mismatch (2.8e-1); the isometry and
   projector-completeness tests in `tests/unit/test_sectors.py` pin sectors.
@@ -94,8 +98,8 @@ citation in the constant's comment, no test update needed:
 
 - `otoc._SPECTRAL_BLOCK` - measured flat 8.0-8.6 s for blocks 128..4096
   (dim 2925, 4096-time curve): a memory ceiling, not a throughput knob.
-- `krylov.MAX_REORTH_ITERATIONS` - pure safety cap, ~20x above the measured
-  1-pass convergence.
+- `krylov.MAX_REORTH_ITERATIONS` - pure safety cap: measured convergence is
+  the 1st pass, so 20 is headroom, not a tuned boundary.
 - `mean_field_lattice._DEFAULT_LYAPUNOV_DELTA` - exponent invariant over
   delta in [1e-4, 1e-12] (measured identical to 8 digits).
 - `mean_field_lattice._DEFAULT_FP_N_RANDOM`,

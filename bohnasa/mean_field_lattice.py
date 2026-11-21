@@ -72,7 +72,71 @@ __all__ = ["MeanFieldLattice"]
 # systems (L <= ~20, phase-space dim <= 40) where Radau factorizes a dense
 # O(40^3) matrix per step and a scipy.sparse pipeline would add machinery
 # without a measured speedup (CODING_RULES: benchmark before optimizing).
-_MAX_EXACT_SEED_PATTERNS = 256  # exhaustive +-sign seeds only for L <= 8
+#
+# Numerical settings policy (issue #25): every knob below is a named constant
+# with the regime it protects, measured on a 16-core host. See
+# CONTRIBUTING.md "Numerical settings policy".
+#
+# +-sign seed patterns are enumerated exhaustively only up to this cap
+# (2^8): each hybr solve costs ~3-4 ms here, so the cap keeps the exhaustive
+# part under ~1 s (measured: L = 8, 324 seeds, fixed_points 1.01 s) and L >= 9
+# switches to sampled sign coverage (measured: L = 10, 386 seeds, 1.50 s).
+# tests/unit/test_mean_field_lattice.py pins the fallback branch by
+# monkeypatching the cap down to 8 at L = 4.
+_MAX_EXACT_SEED_PATTERNS = 256
+# Default solve_ivp tolerances for trajectory() and lyapunov(). Pinned
+# anchors at these values: trajectory energy drift measured 3.9e-10 against
+# the doctest bound 1e-9 (L = 2, t in [0, 4]); lyapunov doctest digits 0.0828
+# (benettin) / 0.084 (qr) reproduce; the DOP853 cross-check in
+# tests/unit/test_mean_field_lattice.py compares at rtol 1e-10 explicitly.
+# Loosen only together with the anchors they carry.
+_DEFAULT_SOLVER_RTOL = 1e-9
+_DEFAULT_SOLVER_ATOL = 1e-12
+# Lyapunov perturbation magnitude. Measured invariant: the benettin exponent
+# on the L = 4 chaotic doctest orbit is identical to 8 digits for delta from
+# 1e-4 to 1e-12 (t <= 20), far from the collapse regime the two-trajectory
+# method reaches at 1e-300 (pinned by tests/unit/test_mean_field_lattice.py).
+_DEFAULT_LYAPUNOV_DELTA = 1e-8
+# Random shell seeds in addition to the structured ones in fixed_points().
+# A coverage/runtime compromise, NOT a saturation point: the count of found
+# distinct points grows with it (measured L = 4: 17 at 60, 29 at 150, 50 at
+# 300 seeds); the search is explicitly heuristic for L >= 3 (module docstring).
+# L = 2 (the dimer case the doctests pin) is complete from structured seeds.
+_DEFAULT_FP_N_RANDOM = 60
+# Residual gate of the fixed-point acceptance test. Measured: every hybr
+# success (80 seeds, L = 4) lands at residual <= 1.3e-14, five orders below
+# the gate - it guards only against misreported successes, while non-converged
+# solves scatter up to 6.4e-1 residual.
+_DEFAULT_FP_TOL = 1e-9
+# Realness tolerance of _state(): accepts complex input with round-off
+# imaginary parts (measured <= 2.8e-17 for FFT round-trips), rejects
+# physical-scale ones (same regime as classical_mean_field._REAL_INPUT_TOL).
+_STATE_IMAG_TOL = 1e-12
+# Duplicate-cluster radius of fixed_points(). Measured at L = 4: seeds
+# converging to the same point agree to <= 8.3e-15 (Chebyshev), while the
+# closest genuinely distinct pair sits 1.7e-3 away - the tol merges clones
+# and splits real points by >= 3 orders on either side.
+_FP_DEDUP_TOL = 1e-6
+# Particle-number shell gate rejecting the spurious clamped-q0 branch of
+# _unpack_fp(). Measured at L = 4: accepted roots deviate |N(z) - L| <=
+# 8.9e-16; clamped-branch rejections deviate by >= 1.6e-1.
+_FP_SHELL_TOL = 1e-8
+# hybr stopping tolerance / function-evaluation budget of the fixed-point
+# solves. xtol 1e-13 produces the measured 1e-14-scale residuals that keep
+# every success under _DEFAULT_FP_TOL (at xtol 1e-8, 2 of 51 solved seeds
+# fall out of the gate - measured, L = 4). maxfev is never the binding
+# constraint: the largest observed solve used 646 of the 4000 evaluations.
+_ROOT_XTOL = 1e-13
+_ROOT_MAXFEV = 4000
+# Determinism anchors (tested invariants, not tunables): the fixed_points
+# reproducibility test (tests/unit/test_mean_field_lattice.py) and the
+# four-digit lyapunov doctests track these exact streams. _SEED_LARGE_L_SIGNS
+# draws sampled +-sign patterns above the pattern cap, _SEED_FP_SHELL the
+# random shell seeds of fixed_points, _SEED_LYAPUNOV_V0 the default tangent
+# direction.
+_SEED_LARGE_L_SIGNS = 26
+_SEED_FP_SHELL = 1234
+_SEED_LYAPUNOV_V0 = 26
 
 
 class MeanFieldLattice:
@@ -179,7 +243,7 @@ class MeanFieldLattice:
         arr = np.asarray(z, dtype=complex)
         if arr.ndim != 1 or arr.size != self.dim:
             raise ValueError(f"expected a state vector of shape ({self.dim},), got {np.shape(z)}")
-        if np.max(np.abs(arr.imag)) > 1e-12:
+        if np.max(np.abs(arr.imag)) > _STATE_IMAG_TOL:
             raise ValueError("state must be real (q, p) amplitudes")
         out = arr.real.astype(float)
         if not np.all(np.isfinite(out)):
@@ -338,8 +402,8 @@ class MeanFieldLattice:
         z0: Sequence[float] | np.ndarray,
         times: Sequence[float] | np.ndarray,
         method: str = "Radau",
-        rtol: float = 1e-9,
-        atol: float = 1e-12,
+        rtol: float = _DEFAULT_SOLVER_RTOL,
+        atol: float = _DEFAULT_SOLVER_ATOL,
     ) -> np.ndarray:
         """Integrate the flow with ``solve_ivp`` (analytic-Jacobian Radau).
 
@@ -400,7 +464,9 @@ class MeanFieldLattice:
             raise RuntimeError(f"trajectory integration failed: {sol.message}")
         return sol.y.T
 
-    def fixed_points(self, n_random: int = 60, tol: float = 1e-9) -> np.ndarray:
+    def fixed_points(
+        self, n_random: int = _DEFAULT_FP_N_RANDOM, tol: float = _DEFAULT_FP_TOL
+    ) -> np.ndarray:
         r"""Relative fixed points as rows ``(n_fixed, 2L)``, sorted by energy.
 
         Solves ``flow(z*) = gamma * (-p, q)`` - stationary up to the global
@@ -439,7 +505,7 @@ class MeanFieldLattice:
             if not ok:
                 continue
             z, gamma = self._unpack_fp(y)
-            if any(np.max(np.abs(z - z_old)) < 1e-6 for z_old, _ in found):
+            if any(np.max(np.abs(z - z_old)) < _FP_DEDUP_TOL for z_old, _ in found):
                 continue
             found.append((z, gamma))
         if not found:
@@ -455,7 +521,7 @@ class MeanFieldLattice:
         grid = np.arange(min(n_pattern, _MAX_EXACT_SEED_PATTERNS))
         signs = np.where((grid[:, None] >> np.arange(sites)) & 1, -1.0, 1.0)
         if n_pattern > _MAX_EXACT_SEED_PATTERNS:  # sparse coverage for large L
-            rng = np.random.default_rng(26)
+            rng = np.random.default_rng(_SEED_LARGE_L_SIGNS)
             signs = np.vstack((signs, rng.choice((-1.0, 1.0), size=(n_random, sites))))
         for row in signs:  # homogeneous |phi_j| = 1 with +- phase patterns
             seeds.append(self._pack_fp(row * np.sqrt(2.0), np.zeros(sites)))
@@ -465,7 +531,7 @@ class MeanFieldLattice:
             seeds.append(
                 self._pack_fp(np.sqrt(2.0) * np.cos(k * js), np.sqrt(2.0) * np.sin(k * js))
             )
-        rng = np.random.default_rng(1234)
+        rng = np.random.default_rng(_SEED_FP_SHELL)
         for _ in range(n_random):  # uniform shell points
             v, w = rng.normal(size=sites), rng.normal(size=sites)
             scale = np.sqrt(2.0 * sites / np.sum(v * v + w * w))
@@ -507,7 +573,7 @@ class MeanFieldLattice:
         # one branch of the options-union; the runtime call is unchanged.
         root_options: dict[str, Any] = {
             "method": "hybr",
-            "options": {"xtol": 1e-13, "maxfev": 4000},
+            "options": {"xtol": _ROOT_XTOL, "maxfev": _ROOT_MAXFEV},
         }
         sol = sopt.root(self._fp_residual, seed, **root_options)
         if not sol.success or float(np.linalg.norm(self._fp_residual(sol.x))) >= tol:
@@ -516,7 +582,7 @@ class MeanFieldLattice:
         # the eliminated q0 = sqrt(max(2L - shell, 0)) has a spurious clamped
         # branch (q0 = 0, off the number shell); real fixed points must sit
         # on it exactly, independent of where the Newton step landed
-        if abs(self.particle_number(z) - self._L) > 1e-8:
+        if abs(self.particle_number(z) - self._L) > _FP_SHELL_TOL:
             return seed, False
         return sol.x, True
 
@@ -526,9 +592,9 @@ class MeanFieldLattice:
         times: Sequence[float] | np.ndarray,
         method: str = "benettin",
         v0: Sequence[float] | np.ndarray | None = None,
-        delta: float = 1e-8,
-        rtol: float = 1e-9,
-        atol: float = 1e-12,
+        delta: float = _DEFAULT_LYAPUNOV_DELTA,
+        rtol: float = _DEFAULT_SOLVER_RTOL,
+        atol: float = _DEFAULT_SOLVER_ATOL,
     ) -> float:
         r"""Maximal Lyapunov exponent of the flow over the ``times`` horizon.
 
@@ -588,7 +654,7 @@ class MeanFieldLattice:
         if not np.isfinite(delta) or delta <= 0.0:
             raise ValueError("delta must be positive")
         if v0 is None:
-            v0_arr = np.random.default_rng(26).normal(size=self.dim)
+            v0_arr = np.random.default_rng(_SEED_LYAPUNOV_V0).normal(size=self.dim)
         else:
             v0_arr = self._state(v0)
         v0_arr = v0_arr / float(np.linalg.norm(v0_arr))

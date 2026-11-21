@@ -32,9 +32,26 @@ from .operators import Operator
 
 __all__ = ["SquaredCommutator"]
 
+# Auto-dispatch threshold for the dense eigensolve fallback. It bounds the
+# one-shot O(dim^3) LAPACK cost, measured on the non-tridiagonal 2-particle
+# chain (16-core host, fresh process per point; benchmarks/propagation_scaling.py
+# reproduces the shape, a warm single process runs somewhat higher):
+# eigensolve 0.18 s at dim 861, 2.5 s at 1770, 5.0 s at 2080, 16.6 s at
+# 2926; peak RSS ~340-780 MB where the krylov path stays under 150 MB.
+# The STEMR path is exempt at any size - for width-1 Hamiltonians the full
+# eigendecomposition is O(dim^2). Below the limit the eigensolve amortizes
+# over the curve: a 2001-point curve costs 0.3 s, vs 13.4 s for per-point
+# expm_multiply at dim 861; above it, short curves take the O(dim)-memory
+# krylov path and long-curve callers pass method="eig" explicitly. The
+# dispatch boundary is pinned by
+# tests/unit/test_otoc.py::test_method_auto_uses_stemr_for_tridiagonal_above_the_dense_limit;
+# retune with a fresh run of the benchmark above on the target host.
 _DENSE_EIG_LIMIT = 2000
 # columns per spectral batch: caps the dim x block complex temporaries at
-# ~130 MB for dim ~8200 while staying in the BLAS-3 regime
+# ~130 MB for dim ~8200 while staying in the BLAS-3 regime - measured flat:
+# a 4096-time curve at dim 2925 takes 8.0-8.6 s for any block from 128 to
+# 4096 (16-core host), so the block size buys memory headroom, not
+# throughput; at 1024 columns each temporary is 16 KB per row.
 _SPECTRAL_BLOCK = 1024
 
 

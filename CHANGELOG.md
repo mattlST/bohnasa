@@ -11,7 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   with `TruncatedWigner` and `WignerSampler` — Wigner-representation
   sampling around a Gross-Pitaevskii point of any engine following the
   documented `dim`/`filling`/`trajectory` protocol (`MeanFieldLattice`
-  primary; the kicked-ring map plugs in when #29 merges), per-sample
+  primary; the merged kicked-ring map of `bohnasa.kicked` matches the map
+  structure and awaits a three-method protocol shim), per-sample
   propagation through the engine's own integrator, fixed-seed
   byte-reproducible ensembles with nested prefixes, sample means with
   standard errors, and a TWA squared commutator built from

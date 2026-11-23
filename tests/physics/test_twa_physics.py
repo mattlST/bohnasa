@@ -72,7 +72,10 @@ def test_twa_short_time_matches_quantum_with_hbar_eff_deviation():
     Measured (K = 1200, seed 11, t = 1e-3 and 5e-3): relative deviations
     0.1244 / 0.0602 / 0.0294 at N_phys = 8 / 16 / 32 - coefficients
     0.995 / 0.963 / 0.942 of hbar_eff = 1/N_phys, with the two probe
-    times agreeing to <= 4e-5 (a genuine t -> 0 plateau). The leading
+    times agreeing to <= 4e-5 (a genuine t -> 0 plateau). Independent-
+    seed scan at N_phys = 8 (five seeds): coefficients 0.96-1.17 (std
+    ~0.08), so expect +-0.1-class scatter at the smallest N - every
+    draw lands well inside the pinned band. The leading
     correction is the dropped product-rule Moyal term averaged over the
     finite-width wave packet; the unsampled bracket is exact to leading
     order (next test).
@@ -194,8 +197,11 @@ def test_sample_mean_converges_to_mean_field_at_mc_rate():
     fixed stream, hence the envelope rather than monotonicity is pinned),
     log-log slope -0.45 (band < -0.35): the Monte-Carlo rate onto the
     deterministic ensemble average. The large-sample gap to the scaled
-    mean-field orbit is 0.178 occupation units (~1.4 hbar_M on the
-    per-site scale): the O(hbar_eff) back-reaction. The TWA -> mean-field
+    mean-field orbit is 0.178 occupation units at K = 512, O(hbar_M) on
+    the per-site scale - a verification-run ladder (K >= 2048, several
+    seeds) puts the asymptotic floor nearer 0.10-0.13, with the K = 512
+    figure carrying reference-ensemble noise. The O(hbar_eff) back-
+    reaction reading is unchanged. The TWA -> mean-field
     statement is two-stage: samples -> ensemble average, and hbar_eff ->
     0 -> the mean-field orbit.
     """

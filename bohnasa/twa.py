@@ -23,8 +23,13 @@ protocol directly. The kicked-ring map of issue #29 (planned module
 ``bohnasa.kicked``, branch ``feat/kicked-bh-29``) matches the same
 protocol through its ``(s, phi)``/``alpha`` gauge - the gauge lives inside
 the engine's state and this sampler only displaces and propagates engine
-states - but nothing here imports it: that integration is pending the
-merge of #29.
+states - but nothing here imports it yet: the merged
+:class:`bohnasa.KickedMeanFieldMap` (issue #29) exposes ``step`` /
+``iterate`` but not the protocol's ``dim`` / ``filling`` / ``trajectory``,
+so adoption needs only a three-method shim; until then passing it to
+:class:`TruncatedWigner` raises the protocol ``TypeError``, and
+``tests/unit/test_twa.py`` validates the map-shaped path with a
+hand-rolled symplectic mock instead.
 
 Phase space and hbar bookkeeping. Following
 :mod:`bohnasa.mean_field_lattice`, ``phi_j = (q_j + i p_j) / sqrt(2)``

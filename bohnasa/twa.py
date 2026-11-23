@@ -102,7 +102,18 @@ itself as a phase-space ensemble, in this module the crossover is a
 quantum curve (saturation on the Ehrenfest time ``log(N) / lambda_s``)
 is precisely what TWA cannot capture. The physics test measures the two
 sides of the crossover for TWA, quantum and the classical point value at
-tiny L, N and pins them within measured bands.
+tiny L, N and pins them within measured bands. The engine's *global*
+maximal Lyapunov exponent (``MeanFieldLattice.lyapunov`` at L >= 4) is
+deliberately NOT pinned against a TWA slope here: the exponent is
+IC-specific and horizon-converging (measured for the L = 4 seed-0 orbit
+0.2197 over t <= 20 and 0.2342 over t <= 40, while the module doctest's
+own initial condition gives 0.0828), and the sampled wave-packet growth
+of ``log C_TWA`` on the short CI horizons is not the asymptotic 2*lambda
+of a single tangent vector (measured slope 0.96 over t in [1, 5] for the
+seed-0 orbit) - that side is documented physics tied to issues #26/#39,
+while the pinned L = 2 comparison uses the exact saddle exponent
+``lambda_s`` (``dimer_lambda`` = the ``stability_matrix`` eigenvalue the
+engine reduces to).
 """
 
 from collections.abc import Callable, Sequence
@@ -119,7 +130,11 @@ __all__ = ["TruncatedWigner", "WignerSampler"]
 # Default determinism seed of TruncatedWigner. Tested invariant: the
 # doctests on this module and the byte-reproducibility tests in
 # tests/unit/test_twa.py track this exact stream; changing it changes every
-# sample set they quote.
+# sample set they quote. Threading (issue #30 acceptance): the RNG stream
+# itself is bit-stable across OMP_NUM_THREADS = 1 vs default (measured
+# 2026-11-22, 16-core host) - what is NOT bit-stable is the Radau
+# propagation downstream (<= 2e-9 relative drift), which is why only
+# sample arrays, not curves, are pinned byte-wise in the tests.
 _DEFAULT_SEED = 2026
 # Central-difference step of the Poisson-bracket shadow trajectories, as a
 # multiple of the Hamiltonian vector field X_O = Omega grad O (the bracket

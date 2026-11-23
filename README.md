@@ -50,6 +50,14 @@ growth and Krylov complexity after a quench.
   quasienergy spectrum in `[0, 2π/τ)` (symmetry-sector blocked), and the
   classical kicked map `KickedMeanFieldMap`, whose τ→0 limit reproduces
   `mean_field_flow` on the dimer (pinned with measured Trotter convergence)
+- `TruncatedWigner` / `WignerSampler` — truncated-Wigner (TWA)
+  semiclassical sampling of mean-field engines: Wigner-representation
+  initial ensembles around a Gross-Pitaevskii point with `hbar_eff = 1/N`
+  bookkeeping, one integrator per sample (the engine's own), sample means
+  with standard errors, and a TWA OTOC from Poisson-bracket shadow
+  trajectories — validated against the exact `SquaredCommutator` at short
+  time (deviation `1 + hbar_eff`) and against the classical Lyapunov
+  growth of the engine in the intermediate window
 - `bohnasa.visualization` — the geometric view of evolved data: ring/chain
   geometry sharing the `Hopping` bond list, `draw_lattice` snapshots,
   `animate_lattice` replays (node area linear in occupation; edge base

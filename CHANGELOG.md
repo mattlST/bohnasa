@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- Truncated-Wigner semiclassical dynamics (issue #30): `bohnasa/twa.py`
+  with `TruncatedWigner` and `WignerSampler` — Wigner-representation
+  sampling around a Gross-Pitaevskii point of any engine following the
+  documented `dim`/`filling`/`trajectory` protocol (`MeanFieldLattice`
+  primary; the kicked-ring map plugs in when #29 merges), per-sample
+  propagation through the engine's own integrator, fixed-seed
+  byte-reproducible ensembles with nested prefixes, sample means with
+  standard errors, and a TWA squared commutator built from
+  Poisson-bracket shadow trajectories. Conventions derived from the
+  engine's relation to the fixed-N quantum model: `hbar_eff = 1/N_phys`,
+  half-quantum (`hbar_eff * L / 2`) engine-quadrature noise, symbol
+  dictionary `n_j <-> (N/L)|phi_j|^2 - 1/2`, commutator rule
+  `C = hbar_M^2 <|{O(t), O}|^2>`. Validated against the exact
+  `SquaredCommutator` (measured short-time deviation `~1.0 hbar_eff`,
+  coefficient `0.94 - 1.00` over `N_phys = 8..32`, rising to `~2.5
+  hbar_eff` across the window) and against classical Lyapunov growth
+  (the sqrt-C exponents run `2 lambda_s -> lambda_s`, TWA tracking the
+  quantum curve within 0.6%); the sample mean converges to the
+  mean-field orbit at the Monte-Carlo `1/sqrt(samples)` rate on a
+  regular orbit. Threading (acceptance): sampler streams and quantum
+  eigensolve references are bit-stable across `OMP_NUM_THREADS`, the
+  Radau-propagated TWA values are not (<= 2e-9 relative drift) — only
+  RNG streams are pinned bitwise, physics bands sit >= 7 orders above
+  threading noise. Example `examples/ex14_twa_semiclassical.py`,
+  settings-policy constants in CONTRIBUTING.md.
 - Kicked (Floquet) Bose-Hubbard ring (`bohnasa.kicked`, issue #29):
   `KickedBoseHubbard(L, tau, J, U)` builds the two-factor drive step
   `U_step = exp(-i tau H_J) exp(-i tau H_U)` from `Hopping`/`Interaction`

@@ -92,6 +92,17 @@ a change is only acceptable together with the corresponding test update:
 - `sectors._MIRROR_PHASE_TOL` - sits between measured round-off (<= 1.4e-13)
   and the smallest true phase mismatch (2.8e-1); the isometry and
   projector-completeness tests in `tests/unit/test_sectors.py` pin sectors.
+- `twa._DEFAULT_SEED`, `twa._BRACKET_FD_EPS`, `twa._GRAD_FD_STEP`,
+  `twa._WIGNER_ZERO_POINT` (issue #30) - the TWA doctest sample arrays and
+  curves track the exact seed stream; the bracket step sits in a measured
+  plateau-to-knee gap (C_TWA agrees to >= 4 digits across eps 3e-4..1e-7,
+  shifts -2.6 % at 1e-2 and -20 % at 3e-2 at t = 2, N_phys = 16 - pinned
+  by `tests/physics/test_twa_physics.py::test_bracket_fd_step_lands_in_measured_gap`);
+  the gradient step's exactness band for quadratic symbols is pinned by
+  `tests/unit/test_twa.py::test_gradient_step_truncation_gap`; the
+  half-quantum factor flips the short-time validation constant
+  `C_TWA / C_quantum = 1 + hbar_eff` in
+  `tests/physics/test_twa_physics.py`.
 
 **(b) Performance hints** - free to retune per host with a fresh benchmark
 citation in the constant's comment, no test update needed:

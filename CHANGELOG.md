@@ -24,7 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   coefficient `0.94 - 1.00` over `N_phys = 8..32`, rising to `~2.5
   hbar_eff` across the window) and against classical Lyapunov growth
   (the sqrt-C exponents run `2 lambda_s -> lambda_s`, TWA tracking the
-  quantum curve within 0.6%); the sample mean converges to the
+  quantum curve within 0.7% - measured 0.64%); the sample mean converges to the
   mean-field orbit at the Monte-Carlo `1/sqrt(samples)` rate on a
   regular orbit. Threading (acceptance): sampler streams and quantum
   eigensolve references are bit-stable across `OMP_NUM_THREADS`, the

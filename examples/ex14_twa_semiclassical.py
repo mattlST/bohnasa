@@ -27,7 +27,8 @@ collapses onto the deterministic ensemble average at the Monte-Carlo
 1/sqrt(samples) rate; the gap that survives is the O(hbar_eff)
 ensemble-vs-mean-field back-reaction, drawn as the plateau. Panel 3 is
 the geometric view (bohnasa.visualization): occupation heatmaps of the
-TWA sample mean versus the single mean-field orbit on an L = 4 ring.
+TWA sample mean, the single mean-field orbit, and an exact-quantum ED
+reference (fixed-N ring, N_phys = L = 4, dim 35) on an L = 4 ring.
 
 Headless and byte-reproducible: fixed seeds everywhere, and the figure
 pair is rendered twice from the same data and hash-compared (Agg).
@@ -54,10 +55,11 @@ from bohnasa.visualization import occupation_heatmap
 
 THETA = 1.35  # unstable dimer saddle regime (examples/ex09 anchor point)
 N_PHYS = 16
-# The ensemble sizes used below (240 / 800 / 384 / 64 samples) keep the
-# full-script runtime at ~1 min 25 s on this 16-core dev host (numpy
-# 2.5.5 / scipy 1.18.1, measured with `time`); the physics values they
-# produce are re-pinned with independent margins in
+# The ensemble sizes used below (240 / 800 / 384 / 64 samples, plus the
+# dim-35 ED eigensolve) keep the full-script runtime at ~1 min 50 s on
+# this 16-core dev host (numpy 2.5.5 / scipy 1.18.1, cpufreq powersave
+# governor, measured twice with `time`: 1m48.9s and 1m51.4s); the
+# physics values they produce are re-pinned with independent margins in
 # tests/physics/test_twa_physics.py, and no timing enters the printed
 # output (CODING_RULES performance-path justification channel).
 HBAR = 1.0 / N_PHYS
@@ -250,16 +252,63 @@ def occupations(traj: np.ndarray) -> np.ndarray:
     return 0.5 * (traj[..., occ_sites] ** 2 + traj[..., occ_sites + 4] ** 2)
 
 
-occ_mean = occupations(trajs4).mean(axis=0) - 0.5  # Weyl symbol of n̂_j
-occ_mf = occupations(lat4.trajectory(z4, times4)) - 0.5
-fig3, (ax3, ax4) = plt.subplots(1, 2, figsize=(11.5, 3.4))
-occupation_heatmap(times4, occ_mean, ax=ax3)
-ax3.set_title("TWA sample mean $\\langle \\hat{n}_j(t)\\rangle$ (64 samples)")
-occupation_heatmap(times4, occ_mf, ax=ax4)
-ax4.set_title("single mean-field orbit $|\\phi_j(t)|^2 - 1/2$")
+occ_mean = occupations(trajs4).mean(axis=0) - 0.5  # occupation estimator (b)
+occ_mf = occupations(lat4.trajectory(z4, times4))  # GP occupations, no shift
+
+# exact quantum reference: dense ED on the fixed-N ring, N_phys = L = 4
+# (dim binom(7, 4) = 35), the dictionary-(b) partner of the engine shell
+# state z4. The engine GP flow carries nonlinear coefficient sin(theta)
+# on the shell, so the matching quantum onsite coupling is
+# onsite_u = sin(theta) * L / (2 * N_phys) - the dimer block's
+# sin(theta) / N_phys is its L = 2 special case, NOT the general rule.
+# Hopping is -cos(theta) per directed bond (the dimer's -2c is the 2-site
+# double-visit of its single bond, visited once here).
+fock4 = FixedNFockSpace(4, 4)
+t4 = np.zeros((4, 4))
+for j4 in range(4):
+    t4[j4, (j4 + 1) % 4] = -coup
+    t4[(j4 + 1) % 4, j4] = -coup
+H4 = Hamiltonian(fock4, one_body=t4, onsite_u=np.sin(THETA) / 2)  # sin(theta)*L/(2*N_phys)
+phi4 = (z4[:4] + 1j * z4[4:]) / np.sqrt(2.0)  # physical GP amplitudes
+psi4 = fixed_n_coherent_state(fock4, phi4 / np.linalg.norm(phi4))
+obs4 = StateObservables(fock4)
+ev4, evec4 = np.linalg.eigh(H4.matrix.toarray())
+coef4 = evec4.conj().T @ psi4
+n_ed4 = np.array(
+    [np.real(obs4.density_profile(evec4 @ (np.exp(-1j * ev4 * tt) * coef4))) for tt in times4]
+)
+vmin3 = float(min(occ_mean.min(), occ_mf.min(), n_ed4.min()))
+vmax3 = float(max(occ_mean.max(), occ_mf.max(), n_ed4.max()))
+fig3, (ax3, ax4, ax5) = plt.subplots(1, 3, figsize=(16.5, 3.4), sharey=True)
+occupation_heatmap(times4, occ_mean, ax=ax3, vmin=vmin3, vmax=vmax3)
+ax3.set_title("TWA occupation estimator (64 samples)")
+occupation_heatmap(times4, occ_mf, ax=ax4, vmin=vmin3, vmax=vmax3)
+ax4.set_title("single mean-field orbit $|\\phi_j(t)|^2$")
+occupation_heatmap(times4, n_ed4, ax=ax5, vmin=vmin3, vmax=vmax3)
+ax5.set_title(r"exact quantum ED $\langle\hat{n}_j(t)\rangle$ (dim 35)")
 fig3.tight_layout()
+# All three rows are occupation numbers now: the -1/2 Weyl shift is kept
+# only where it is physics (the TWA estimator absorbs the ensemble's
+# vacuum half-quanta - its raw engine mean would sum to N + L/2 = 6), so
+# every row sums to N = 4 and the panels are directly comparable.
 diff = float(np.abs(occ_mean - occ_mf).max())
-print(f"L=4 ring (chaotic orbit): max|TWA mean - MF| = {diff:.3f} occupation units")
+diff_q = float(np.abs(occ_mean - n_ed4).max())
+diff_mq = float(np.abs(occ_mf - n_ed4).max())
+print(
+    f"L=4 ring (chaotic orbit): max|TWA mean - MF| = {diff:.3f}, "
+    f"max|TWA mean - ED| = {diff_q:.3f}, max|MF - ED| = {diff_mq:.3f} "
+    "occupation units"
+)
+assert np.abs(n_ed4.sum(axis=1) - 4.0).max() < 1e-9  # ED norm fixed-N
+# Regime note (issue #30 review): the engine shell fixes N_phys = L, so
+# this panel runs at hbar_eff = 1/4 and t = 10 spans ~7 Ehrenfest windows
+# (t_E = ln 4 / lambda_s ~ 1.43): the absolute deviations are
+# breakdown-sized, but the ORDERING is the semiclassical statement - the
+# Wigner ensemble (max|TWA - ED| = 0.218, measured) sits closer to the
+# exact quantum shell than a single GP orbit (max|MF - ED| = 0.451) even
+# deep past the window. max|TWA - MF| = 0.360: the ensemble agrees with
+# quantum better than with its own center trajectory - the vacuum noise,
+# not the GP point, carries the agreement with ED.
 plt.show()
 
 out_dir = Path(__file__).resolve().parent

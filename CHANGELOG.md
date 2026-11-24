@@ -31,8 +31,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   eigensolve references are bit-stable across `OMP_NUM_THREADS`, the
   Radau-propagated TWA values are not (<= 2e-9 relative drift) — only
   RNG streams are pinned bitwise, physics bands sit >= 7 orders above
-  threading noise. Example `examples/ex14_twa_semiclassical.py`,
-  settings-policy constants in CONTRIBUTING.md.
+  threading noise. Example `examples/ex14_twa_semiclassical.py` (panel 3
+  heatmaps add an exact-quantum ED row to the TWA/mean-field pair, L = 4
+  ring, dim 35), settings-policy constants in CONTRIBUTING.md.
 - Kicked (Floquet) Bose-Hubbard ring (`bohnasa.kicked`, issue #29):
   `KickedBoseHubbard(L, tau, J, U)` builds the two-factor drive step
   `U_step = exp(-i tau H_J) exp(-i tau H_U)` from `Hopping`/`Interaction`

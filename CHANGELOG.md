@@ -6,6 +6,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-11-24
+
 ### Added
 - Truncated-Wigner semiclassical dynamics (issue #30): `bohnasa/twa.py`
   with `TruncatedWigner` and `WignerSampler` — Wigner-representation

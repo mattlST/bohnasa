@@ -86,10 +86,17 @@ def test_flow_sample_time_semantics():
     out = mf.mean_field_flow(THETA, y0, shuffled)
     for k, t in enumerate(shuffled):
         assert np.array_equal(out[k], base[np.flatnonzero(sorted_times == t)[0]])
-    # times at or below zero report the initial state (flow starts at t = 0)
+    # decreasing is just unsorted: rows follow the same permutation
+    assert np.array_equal(mf.mean_field_flow(THETA, y0, sorted_times[::-1]), base[::-1])
+    # times at or below the start report the initial state (start is
+    # max(0, min(times)): zero here)
     assert np.allclose(
         mf.mean_field_flow(THETA, [0.1, 2.0], np.array([-4.0, 0.0])), [[0.1, 2.0], [0.1, 2.0]]
     )
+    # a positive start anchors the initial pair at the first sample
+    positive = mf.mean_field_flow(THETA, [0.1, 2.0], np.array([2.0, 3.0]))
+    assert np.array_equal(positive[0], [0.1, 2.0])
+    assert not np.array_equal(positive[1], [0.1, 2.0])
 
 
 def test_tolerances_are_honored():

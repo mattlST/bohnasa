@@ -6,12 +6,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+- Unified sample-time semantics across the mean-field engines (issue #45):
+  `MeanFieldLattice.trajectory` now accepts unsorted and duplicate sample
+  times, restoring rows to the caller's order exactly like
+  `mean_field_flow`. Both engines integrate from `max(0, min(times))` with
+  the initial state at that time, so times at or below the start report the
+  initial state. Inputs that were previously rejected (unsorted or
+  duplicate grids) now succeed. A positive non-zero start now anchors the
+  initial state at the first sample in `mean_field_flow` too (the lattice
+  engine's existing convention) instead of integrating from `t = 0`; the
+  Lyapunov renormalization grid remains strictly increasing.
+
 ### Fixed
 - Quarter-circle coupling rule in the engine docstrings (issue #60): the
   general correspondence is `U = sin(theta) * L / N_phys` (`onsite_u = U/2`
   in `Hamiltonian` terms), not the dimer-only `U = 2 sin(theta)/N`. The
-  `mean_field_lattice` and `twa` module docstrings now state the general
-  rule (dimer-scoped wording in `classical_mean_field` and `kicked` is
+  `mean_field.lattice` and `twa` module docstrings now state the general
+  rule (dimer-scoped wording in `mean_field.dimer` and `kicked` is
   unchanged and correct), pinned by a general-L GP-correspondence
   regression test: measured max occupation deviation 3.37e-10 at L = 4,
   theta = 1.35, while the dimer-only rule deviates by 0.655 (half the

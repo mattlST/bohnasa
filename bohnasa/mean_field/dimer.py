@@ -152,8 +152,9 @@ def mean_field_flow(
     initial : tuple of float
         Starting ``(s, phi)``.
     times : numpy.ndarray
-        Sample times (need not be sorted; duplicates allowed). Times at or
-        below zero report the initial state: the flow starts at ``t = 0``.
+        Sample times (need not be sorted; duplicates allowed). The flow
+        starts at ``max(0, min(times))`` with the initial pair at that time;
+        times at or below it report the initial state.
     method : str, keyword-only, default "DOP853"
         Integration method, one of ``"DOP853"``, ``"RK23"``, ``"RK45"``,
         ``"Radau"``, ``"BDF"``, ``"LSODA"`` (handed to ``solve_ivp``).
@@ -199,10 +200,11 @@ def mean_field_flow(
     if y0.size != 2 or np.abs(y0.imag).max() > _REAL_INPUT_TOL:
         raise ValueError("mean_field_flow: initial must be a real pair (s, phi)")
     s0, phi0 = float(y0[0].real), float(y0[1].real)
+    start = max(0.0, float(times.min()))
     order = np.argsort(times)
     targets = times[order]
     out = np.empty((len(times), 2))
-    future = targets > 0.0
+    future = targets > start
     out[order[~future]] = (s0, phi0)
     if np.any(future):
         # DOP853 (issue #24): adaptive high-order integration of the smooth
@@ -221,7 +223,7 @@ def mean_field_flow(
         samples = solve_samples(
             rhs,
             np.array([s0, phi0]),
-            (0.0, float(targets[-1])),
+            (start, float(targets[-1])),
             unique,
             method=method,
             rtol=rtol,

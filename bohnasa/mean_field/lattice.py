@@ -57,6 +57,8 @@ import numpy as np
 import scipy.optimize as sopt
 from scipy.integrate import solve_ivp
 
+from .solver import check_sample_times, check_solver_knobs, solve_samples
+
 __all__ = ["MeanFieldLattice"]
 
 # Dense (2L x 2L) Jacobians are used throughout: the engine targets small
@@ -404,7 +406,9 @@ class MeanFieldLattice:
         z0 : array_like
             Initial state, length ``2L``.
         times : array_like
-            Strictly increasing sample times; ``times[0]`` is the start time.
+            Sample times (need not be sorted; duplicates allowed). The flow
+            starts at ``max(0, min(times))`` with ``z0`` at that time; times
+            at or below it report ``z0``.
         method : str, default "Radau"
             Implicit ``solve_ivp`` scheme (matches the reference engine the
             dimer numbers were checked against); ``"DOP853"`` also works.
@@ -429,32 +433,32 @@ class MeanFieldLattice:
         True
         """
         z0 = self._state(z0)
-        times = np.asarray(times, dtype=float)
-        if times.ndim != 1 or times.size == 0:
-            raise ValueError("times must be a non-empty 1D array")
-        if not np.all(np.isfinite(times)) or not np.all(np.diff(times) > 0.0):
-            raise ValueError("times must be finite and strictly increasing")
-        if times.size == 1:
-            return np.array([z0])
-        # scipy-stubs types ``method`` as an exhaustive Literal; the engine
-        # deliberately accepts any solve_ivp scheme name, so the options are
-        # passed through an Any-typed mapping. Explicit Runge-Kutta schemes
-        # ignore (and warn about) ``jac``, so only implicit ones get it.
-        solver_options: dict[str, Any] = {"method": method}
-        if method not in ("RK23", "RK45", "DOP853"):
-            solver_options["jac"] = self._jac
-        sol = solve_ivp(
-            self._rhs,
-            (float(times[0]), float(times[-1])),
-            z0,
-            t_eval=times,
-            rtol=rtol,
-            atol=atol,
-            **solver_options,
-        )
-        if not sol.success:
-            raise RuntimeError(f"trajectory integration failed: {sol.message}")
-        return sol.y.T
+        times = check_sample_times(times, prefix="trajectory")
+        check_solver_knobs(method, rtol, atol, prefix="trajectory")
+        start = max(0.0, float(times.min()))
+        order = np.argsort(times)
+        targets = times[order]
+        out = np.empty((len(times), self.dim))
+        future = targets > start
+        out[order[~future]] = z0
+        if np.any(future):
+            # solve_ivp rejects duplicate t_eval entries: deduplicate the
+            # sorted targets and restore the caller's rows via np.unique's
+            # inverse index (the flow-side convention of issue #45).
+            unique, inverse = np.unique(targets[future], return_inverse=True)
+            samples = solve_samples(
+                self._rhs,
+                z0,
+                (start, float(targets[-1])),
+                unique,
+                method=method,
+                rtol=rtol,
+                atol=atol,
+                jac=self._jac,
+                prefix="trajectory",
+            )
+            out[order[future]] = samples[inverse]
+        return out
 
     def fixed_points(
         self, n_random: int = _DEFAULT_FP_N_RANDOM, tol: float = _DEFAULT_FP_TOL

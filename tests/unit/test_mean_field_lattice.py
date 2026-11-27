@@ -61,12 +61,30 @@ def test_times_validation(lat2):
     with pytest.raises(ValueError):
         lat2.trajectory([1.0, 1.0, 0.0, 0.0], np.array([]))
     with pytest.raises(ValueError):
-        lat2.trajectory([1.0, 1.0, 0.0, 0.0], np.array([1.0, 0.5]))
+        lat2.trajectory([1.0, 1.0, 0.0, 0.0], np.ones((2, 2)))
     with pytest.raises(ValueError):
         lat2.trajectory([1.0, 1.0, 0.0, 0.0], np.array([0.0, np.inf]))
     single = lat2.trajectory([1.4, 0.6, 0.1, 0.2], np.array([3.0]))
     assert single.shape == (1, 4)
     assert np.allclose(single[0], [1.4, 0.6, 0.1, 0.2])
+
+
+def test_trajectory_sample_time_semantics(lat2):
+    """Issue #45: unsorted/duplicate times are accepted family-wide."""
+    start = np.array([1.4, 0.6, 0.1, 0.2])
+    sorted_times = np.array([0.0, 0.5, 1.5, 2.5])
+    shuffled = np.array([2.5, 0.0, 1.5, 0.5, 1.5])
+    base = lat2.trajectory(start, sorted_times)
+    out = lat2.trajectory(start, shuffled)
+    for k, t in enumerate(shuffled):
+        assert np.array_equal(out[k], base[np.flatnonzero(sorted_times == t)[0]])
+    # decreasing is just unsorted: rows follow the same permutation
+    assert np.array_equal(lat2.trajectory(start, sorted_times[::-1]), base[::-1])
+    # times at or below the start report the initial state
+    below = lat2.trajectory(start, np.array([-4.0, 0.0]))
+    assert np.array_equal(below, np.array([start, start]))
+    positive = lat2.trajectory(start, np.array([2.0, 3.0]))
+    assert np.array_equal(positive[0], start)
 
 
 def test_trajectory_shape_and_shift(lat4):
@@ -164,6 +182,9 @@ def test_solver_failure_is_surfaced(lat2, monkeypatch):
         message = "stubbed failure"
         y = np.zeros((4, 1))
 
+    # trajectory routes through mean_field.solver; the Lyapunov segments
+    # keep their own direct solve_ivp call in the lattice module
+    monkeypatch.setattr(bohnasa.mean_field.solver, "solve_ivp", lambda *a, **k: _Failed())
     monkeypatch.setattr(bohnasa.mean_field.lattice, "solve_ivp", lambda *a, **k: _Failed())
     times = np.linspace(0.0, 1.0, 3)
     start = np.array([np.sqrt(2.0), 0.4, 0.3, 0.2])

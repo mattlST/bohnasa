@@ -245,3 +245,48 @@ def test_uniform_mu_only_rotates_the_occupations():
         occ.append(0.5 * (traj[:, :4] ** 2 + traj[:, 4:] ** 2))
     # uniform mu enters the flow as a pure global phase rotation
     assert np.abs(occ[0] - occ[1]).max() < 1e-6  # observed 5.6e-9
+
+
+def test_quarter_circle_rule_general_l_gp_correspondence():
+    """Engine flow vs GP flow of the consistent quantum model (issue #60).
+
+    The general quarter-circle rule is U = sin(theta) * L / N_phys
+    (Hamiltonian translation onsite_u = U/2); the dimer formula
+    2 sin(theta)/N coincides with it only at L = 2. Independent reference:
+    hand-written GP flow in physical amplitudes alpha (sum |alpha|^2 =
+    N_phys), Radau at rtol=1e-11 / atol=1e-13, ex14 seed orbit at L = 4.
+    """
+    L = N_phys = 4
+    c, s = np.cos(THETA), np.sin(THETA)
+    z4 = np.array([np.sqrt(2.4), np.sqrt(1.8), np.sqrt(2.0), np.sqrt(1.8), 0.4, -0.3, 0.2, -0.1])
+    z4 *= np.sqrt(2 * L) / np.linalg.norm(z4)
+    times = np.linspace(0.0, 10.0, 41)
+    hop = np.zeros((L, L))
+    for j in range(L):
+        hop[j, (j + 1) % L] = hop[(j + 1) % L, j] = -c
+
+    def gp_flow(u_quantum):
+        a0 = (z4[:L] + 1j * z4[L:]) / np.sqrt(2.0)
+
+        def rhs(_t, y):
+            alpha = y[:L] + 1j * y[L:]
+            d = -1j * (hop @ alpha + (u_quantum / 2) * (2 * np.abs(alpha) ** 2 - 1) * alpha)
+            return np.concatenate((d.real, d.imag))
+
+        sol = solve_ivp(
+            rhs,
+            (0.0, 10.0),
+            np.concatenate((a0.real, a0.imag)),
+            t_eval=times,
+            rtol=1e-11,
+            atol=1e-13,
+            method="Radau",
+        )
+        return np.abs(sol.y[:L] + 1j * sol.y[L:]).T ** 2
+
+    traj = bohnasa.MeanFieldLattice(L, THETA).trajectory(z4, times)
+    n_eng = 0.5 * (traj[:, :L] ** 2 + traj[:, L:] ** 2)
+    # observed 3.37e-10 with the general rule; the dimer-only rule
+    # 2 sin(theta)/N runs at half the interaction and deviates by 0.655
+    assert np.abs(gp_flow(s * L / N_phys) - n_eng).max() < 1e-6
+    assert np.abs(gp_flow(2 * s / N_phys) - n_eng).max() > 0.1

@@ -12,10 +12,15 @@ p_{L-1})`` of length ``2L``; the mean-field amplitudes are
 ``n_j = |phi_j|^2 = (q_j^2 + p_j^2) / 2``.
 
 Coupling. Quarter-circle parameterization ``J = cos(theta)``,
-``U = 2 sin(theta) / N``, so the flow written for density-scaled amplitudes
-``phi_j * sqrt(L / N)`` is independent of the total particle number ``N``;
-the norm is then a gauge choice and this engine fixes unit filling ``N = L``
-(occupation shell ``sum_j n_j = L``). With ``c = cos(theta)`` and
+``U = sin(theta) * L / N_phys`` in the standard-form quantum model
+``H = -J sum_<jk> (c^dag_j c_k + h.c.) + (U/2) sum_j n_j (n_j - 1)``
+(``Hamiltonian`` translation: ``onsite_u = U / 2``), so the flow written
+for density-scaled amplitudes ``phi_j = sqrt(L / N_phys) * alpha_j`` is
+independent of the total particle number ``N_phys``; the norm is then a
+gauge choice and this engine fixes unit filling ``N_phys = L``
+(occupation shell ``sum_j n_j = L``, where ``U = sin(theta)``). The dimer
+formula ``U = 2 sin(theta) / N`` is its ``L = 2`` special case only.
+With ``c = cos(theta)`` and
 ``u = sin(theta)`` the Hamiltonian is
 
     H = -c * sum_j (q_j q_{j+1} + p_j p_{j+1})
@@ -148,7 +153,8 @@ class MeanFieldLattice:
         Number of lattice sites, ``L >= 2``.
     theta : float
         Quarter-circle coupling angle, ``J = cos(theta)``,
-        ``U = 2 sin(theta) / N`` with ``N = L``.
+        ``U = sin(theta) * L / N_phys`` (``= sin(theta)`` on the engine
+        shell ``N_phys = L``); see the module docstring.
     mu : float, default 0.0
         Chemical-potential-like shift; for uniform ``mu`` it only rotates
         the global phase, leaving relative dynamics unchanged.

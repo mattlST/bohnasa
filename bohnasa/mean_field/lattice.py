@@ -2,26 +2,12 @@
 
 This module provides the classical mean-field flow of the lattice
 Bose-Hubbard model for arbitrary ``L``; the closed-form dimer in
-:mod:`bohnasa.classical_mean_field` is the ``L = 2`` special case, pinned by
-reduction tests. Conventions below are stated once here and follow the
-doctoral thesis cited in ``CITATION.cff`` (Sec. 10.1 and App. A.1).
-
-Phase space. A state is the real vector ``z = (q_0, ..., q_{L-1}, p_0, ...,
-p_{L-1})`` of length ``2L``; the mean-field amplitudes are
-``phi_j = (q_j + i p_j) / sqrt(2)`` with occupations
-``n_j = |phi_j|^2 = (q_j^2 + p_j^2) / 2``.
-
-Coupling. Quarter-circle parameterization ``J = cos(theta)``,
-``U = sin(theta) * L / N_phys`` in the standard-form quantum model
-``H = -J sum_<jk> (c^dag_j c_k + h.c.) + (U/2) sum_j n_j (n_j - 1)``
-(``Hamiltonian`` translation: ``onsite_u = U / 2``), so the flow written
-for density-scaled amplitudes ``phi_j = sqrt(L / N_phys) * alpha_j`` is
-independent of the total particle number ``N_phys``; the norm is then a
-gauge choice and this engine fixes unit filling ``N_phys = L``
-(occupation shell ``sum_j n_j = L``, where ``U = sin(theta)``). The dimer
-formula ``U = 2 sin(theta) / N`` is its ``L = 2`` special case only.
-With ``c = cos(theta)`` and
-``u = sin(theta)`` the Hamiltonian is
+:mod:`bohnasa.mean_field.dimer` is the ``L = 2`` special case, pinned by
+reduction tests. Phase space, quarter-circle coupling, shell normalization,
+canonical brackets and sample times are stated once in
+:mod:`bohnasa.mean_field` and pinned by the tests; this module uses them on
+the unit-filling engine shell ``N_phys = L`` (so ``U = sin(theta)``). With
+``c = cos(theta)`` and ``u = sin(theta)`` the Hamiltonian is
 
     H = -c * sum_j (q_j q_{j+1} + p_j p_{j+1})
         + (u / 2) * sum_j n_j^2
@@ -31,15 +17,15 @@ where ``mu`` acts as a chemical-potential-like shift. The neighbour sums are
 roll sums modulo ``L`` for ``connections="pbc"`` (default) and clipped at the
 chain ends for ``connections="obc"``. A two-site PBC ring visits its single
 bond from both directions, so the bond counts twice; that is precisely the
-dimer convention of :mod:`bohnasa.classical_mean_field`, whose reduced
+dimer convention of :mod:`bohnasa.mean_field.dimer`, whose reduced
 variables ``s = (n_0 - n_1) / N``, ``phi = arg(phi_1) - arg(phi_0)``,
 canonical bracket ``{phi, s} = 2 / N`` and per-particle Hamiltonian
 ``h(s, phi) = H / N`` are reproduced exactly (see the reduction tests).
 
-Flow. Hamilton's equations ``dz/dt = Omega grad H`` with the standard
-symplectic matrix ``Omega = [[0, I], [-I, 0]]`` on the ``(q, p)`` layout,
-equivalently ``i dphi_j/dt = dH / dconjugate(phi_j)`` (Gross-Pitaevskii /
-DNLS). Both ``H`` and the norm are conserved along exact solutions; the
+Flow. Hamilton's equations with the family canonical bracket (stated once
+in :mod:`bohnasa.mean_field`), equivalently
+``i dphi_j/dt = dH / dconjugate(phi_j)`` (Gross-Pitaevskii / DNLS). Both
+``H`` and the norm are conserved along exact solutions; the
 analytic Jacobian ``D(Omega grad H) = Omega Hess H`` is supplied to
 ``scipy.integrate.solve_ivp`` (default ``method="Radau"``).
 
@@ -70,6 +56,8 @@ from typing import Any
 import numpy as np
 import scipy.optimize as sopt
 from scipy.integrate import solve_ivp
+
+from .solver import check_sample_times, check_solver_knobs, solve_samples
 
 __all__ = ["MeanFieldLattice"]
 
@@ -115,7 +103,7 @@ _DEFAULT_FP_N_RANDOM = 60
 _DEFAULT_FP_TOL = 1e-9
 # Realness tolerance of _state(): accepts complex input with round-off
 # imaginary parts (measured <= 2.8e-17 for FFT round-trips), rejects
-# physical-scale ones (same regime as classical_mean_field._REAL_INPUT_TOL).
+# physical-scale ones (same regime as bohnasa.mean_field.dimer._REAL_INPUT_TOL).
 _STATE_IMAG_TOL = 1e-12
 # Duplicate-cluster radius of fixed_points(). Measured at L = 4: seeds
 # converging to the same point agree to <= 8.3e-15 (Chebyshev), while the
@@ -154,13 +142,13 @@ class MeanFieldLattice:
     theta : float
         Quarter-circle coupling angle, ``J = cos(theta)``,
         ``U = sin(theta) * L / N_phys`` (``= sin(theta)`` on the engine
-        shell ``N_phys = L``); see the module docstring.
+        shell ``N_phys = L``); see :mod:`bohnasa.mean_field`.
     mu : float, default 0.0
         Chemical-potential-like shift; for uniform ``mu`` it only rotates
         the global phase, leaving relative dynamics unchanged.
     connections : {"pbc", "obc"}, default "pbc"
         Neighbour convention; see the module docstring. The dimer reduction
-        to :mod:`bohnasa.classical_mean_field` holds for ``"pbc"``.
+        to :mod:`bohnasa.mean_field.dimer` holds for ``"pbc"``.
 
     Examples
     --------
@@ -407,6 +395,7 @@ class MeanFieldLattice:
         self,
         z0: Sequence[float] | np.ndarray,
         times: Sequence[float] | np.ndarray,
+        *,
         method: str = "Radau",
         rtol: float = _DEFAULT_SOLVER_RTOL,
         atol: float = _DEFAULT_SOLVER_ATOL,
@@ -418,12 +407,25 @@ class MeanFieldLattice:
         z0 : array_like
             Initial state, length ``2L``.
         times : array_like
-            Strictly increasing sample times; ``times[0]`` is the start time.
-        method : str, default "Radau"
-            Implicit ``solve_ivp`` scheme (matches the reference engine the
-            dimer numbers were checked against); ``"DOP853"`` also works.
-        rtol, atol : float
-            Solver tolerances.
+            Sample times (need not be sorted; duplicates allowed). The flow
+            starts at ``max(0, min(times))`` with ``z0`` at that time; times
+            at or below it report ``z0``.
+        method : str, keyword-only, default "Radau"
+            Integration scheme, one of ``"DOP853"``, ``"RK23"``, ``"RK45"``,
+            ``"Radau"``, ``"BDF"``, ``"LSODA"``. Radau is the anchor-pinned
+            reference; implicit schemes receive the analytic Jacobian,
+            explicit Runge-Kutta schemes do not. At the default tolerances
+            all listed schemes agree with Radau to better than 3e-5 on
+            stable, regular and chaotic probe orbits up to ``t = 40``
+            (measured max state deviation 3.8e-09 ... 2.9e-05); chaotic
+            agreement degrades with the horizon (RK23/BDF 7.1e-07 at
+            ``t = 20``, 3.2e-06 at ``t = 40``).
+        rtol : float, keyword-only, default 1e-9
+            Relative integration tolerance handed to ``solve_ivp``; the
+            default is the accuracy point pinned by the trajectory and
+            Lyapunov anchors.
+        atol : float, keyword-only, default 1e-12
+            Absolute integration tolerance (same rationale).
 
         Returns
         -------
@@ -443,32 +445,32 @@ class MeanFieldLattice:
         True
         """
         z0 = self._state(z0)
-        times = np.asarray(times, dtype=float)
-        if times.ndim != 1 or times.size == 0:
-            raise ValueError("times must be a non-empty 1D array")
-        if not np.all(np.isfinite(times)) or not np.all(np.diff(times) > 0.0):
-            raise ValueError("times must be finite and strictly increasing")
-        if times.size == 1:
-            return np.array([z0])
-        # scipy-stubs types ``method`` as an exhaustive Literal; the engine
-        # deliberately accepts any solve_ivp scheme name, so the options are
-        # passed through an Any-typed mapping. Explicit Runge-Kutta schemes
-        # ignore (and warn about) ``jac``, so only implicit ones get it.
-        solver_options: dict[str, Any] = {"method": method}
-        if method not in ("RK23", "RK45", "DOP853"):
-            solver_options["jac"] = self._jac
-        sol = solve_ivp(
-            self._rhs,
-            (float(times[0]), float(times[-1])),
-            z0,
-            t_eval=times,
-            rtol=rtol,
-            atol=atol,
-            **solver_options,
-        )
-        if not sol.success:
-            raise RuntimeError(f"trajectory integration failed: {sol.message}")
-        return sol.y.T
+        times = check_sample_times(times, prefix="trajectory")
+        check_solver_knobs(method, rtol, atol, prefix="trajectory")
+        start = max(0.0, float(times.min()))
+        order = np.argsort(times)
+        targets = times[order]
+        out = np.empty((len(times), self.dim))
+        future = targets > start
+        out[order[~future]] = z0
+        if np.any(future):
+            # solve_ivp rejects duplicate t_eval entries: deduplicate the
+            # sorted targets and restore the caller's rows via np.unique's
+            # inverse index (the flow-side convention of issue #45).
+            unique, inverse = np.unique(targets[future], return_inverse=True)
+            samples = solve_samples(
+                self._rhs,
+                z0,
+                (start, float(targets[-1])),
+                unique,
+                method=method,
+                rtol=rtol,
+                atol=atol,
+                jac=self._jac,
+                prefix="trajectory",
+            )
+            out[order[future]] = samples[inverse]
+        return out
 
     def fixed_points(
         self, n_random: int = _DEFAULT_FP_N_RANDOM, tol: float = _DEFAULT_FP_TOL

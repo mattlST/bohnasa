@@ -61,12 +61,30 @@ def test_times_validation(lat2):
     with pytest.raises(ValueError):
         lat2.trajectory([1.0, 1.0, 0.0, 0.0], np.array([]))
     with pytest.raises(ValueError):
-        lat2.trajectory([1.0, 1.0, 0.0, 0.0], np.array([1.0, 0.5]))
+        lat2.trajectory([1.0, 1.0, 0.0, 0.0], np.ones((2, 2)))
     with pytest.raises(ValueError):
         lat2.trajectory([1.0, 1.0, 0.0, 0.0], np.array([0.0, np.inf]))
     single = lat2.trajectory([1.4, 0.6, 0.1, 0.2], np.array([3.0]))
     assert single.shape == (1, 4)
     assert np.allclose(single[0], [1.4, 0.6, 0.1, 0.2])
+
+
+def test_trajectory_sample_time_semantics(lat2):
+    """Issue #45: unsorted/duplicate times are accepted family-wide."""
+    start = np.array([1.4, 0.6, 0.1, 0.2])
+    sorted_times = np.array([0.0, 0.5, 1.5, 2.5])
+    shuffled = np.array([2.5, 0.0, 1.5, 0.5, 1.5])
+    base = lat2.trajectory(start, sorted_times)
+    out = lat2.trajectory(start, shuffled)
+    for k, t in enumerate(shuffled):
+        assert np.array_equal(out[k], base[np.flatnonzero(sorted_times == t)[0]])
+    # decreasing is just unsorted: rows follow the same permutation
+    assert np.array_equal(lat2.trajectory(start, sorted_times[::-1]), base[::-1])
+    # times at or below the start report the initial state
+    below = lat2.trajectory(start, np.array([-4.0, 0.0]))
+    assert np.array_equal(below, np.array([start, start]))
+    positive = lat2.trajectory(start, np.array([2.0, 3.0]))
+    assert np.array_equal(positive[0], start)
 
 
 def test_trajectory_shape_and_shift(lat4):
@@ -83,6 +101,94 @@ def test_trajectory_accepts_explicit_method(lat4):
     a = lat4.trajectory(np.ones(8), times, method="Radau")
     b = lat4.trajectory(np.ones(8), times, method="DOP853", rtol=1e-10, atol=1e-12)
     assert np.abs(a - b).max() < 1e-6  # same flow, different quadrature
+
+
+def test_trajectory_default_knobs_match_explicit(lat4):
+    times = np.linspace(0.0, 2.0, 21)
+    z0 = np.ones(8)
+    assert np.array_equal(
+        lat4.trajectory(z0, times),
+        lat4.trajectory(z0, times, method="Radau", rtol=1e-9, atol=1e-12),
+    )
+
+
+@pytest.mark.parametrize(
+    "kwargs",
+    [
+        {"method": "verlet"},
+        {"rtol": -1.0},
+        {"rtol": 0.0},
+        {"rtol": np.nan},
+        {"atol": -1.0},
+        {"atol": np.nan},
+    ],
+)
+def test_trajectory_rejects_bad_knobs(lat2, kwargs):
+    with pytest.raises(ValueError, match="trajectory: "):
+        lat2.trajectory([1.4, 0.6, 0.1, 0.2], np.linspace(0.0, 1.0, 3), **kwargs)
+
+
+def test_trajectory_solver_knobs_are_keyword_only(lat2):
+    with pytest.raises(TypeError):
+        lat2.trajectory([1.4, 0.6, 0.1, 0.2], np.linspace(0.0, 1.0, 3), "DOP853")
+
+
+def test_trajectory_jacobian_dispatch(lat2, monkeypatch):
+    """Implicit schemes get the analytic Jacobian, explicit ones never do."""
+    seen: dict[str, bool] = {}
+
+    class _Ok:
+        success = True
+        message = ""
+        y = np.zeros((4, 1))
+
+    def fake(_fun, _t_span, _y0, **kwargs):
+        seen["jac"] = "jac" in kwargs
+        return _Ok()
+
+    monkeypatch.setattr(bohnasa.mean_field.solver, "solve_ivp", fake)
+    times = np.array([0.0, 1.0])
+    for method, expected in (
+        ("Radau", True),
+        ("BDF", True),
+        ("LSODA", True),
+        ("RK23", False),
+        ("RK45", False),
+        ("DOP853", False),
+    ):
+        lat2.trajectory(np.ones(4), times, method=method)
+        assert seen["jac"] is expected
+
+
+def test_trajectory_methods_agree_with_default():
+    """Cross-method bands measured with OMP_NUM_THREADS=1 (issue #46).
+
+    Worst observed deviation across the stable L2, regular L4 and chaotic
+    L4 probes: 2.86e-05 (BDF, regular L4 theta = pi/2 orbit); the band is
+    set at 1e-4.
+    """
+    # L = 2 dimer embedding of (s, phi) = (0.3, 2.0)
+    s, phi = 0.3, 2.0
+    n0, n1 = 1.0 + s, 1.0 - s
+    q = [np.sqrt(n0) * np.cos(-phi / 2), np.sqrt(n1) * np.cos(phi / 2)]
+    p = [np.sqrt(n0) * np.sin(-phi / 2), np.sqrt(n1) * np.sin(phi / 2)]
+    z_stable = np.sqrt(2.0) * np.array(q + p)
+    z_reg = np.array([1.1, 0.9, 0.3, 0.5, 0.7, 0.2, 0.4, 0.6])
+    z_reg *= np.sqrt(8.0) / np.linalg.norm(z_reg)
+    z_ch = np.array([1.0, 1.5, 0.7, 1.3, 0.4, -0.2, 0.9, 0.1])
+    z_ch *= np.sqrt(8.0) / np.linalg.norm(z_ch)
+    probes = (
+        (2, 1.35, z_stable, 8.0, 801),
+        (4, np.pi / 2, z_reg, 20.0, 201),
+        (4, 1.35, z_ch, 40.0, 401),
+    )
+    for L, theta, z0, t_end, n_pts in probes:
+        lat = MeanFieldLattice(L, theta)
+        times = np.linspace(0.0, t_end, n_pts)
+        base = lat.trajectory(z0, times)
+        for method in ("DOP853", "RK23", "RK45", "BDF", "LSODA"):
+            other = lat.trajectory(z0, times, method=method)
+            assert np.abs(other - base).max() < 1e-4
 
 
 def test_lyapunov_validation(lat4):
@@ -164,7 +270,10 @@ def test_solver_failure_is_surfaced(lat2, monkeypatch):
         message = "stubbed failure"
         y = np.zeros((4, 1))
 
-    monkeypatch.setattr(bohnasa.mean_field_lattice, "solve_ivp", lambda *a, **k: _Failed())
+    # trajectory routes through mean_field.solver; the Lyapunov segments
+    # keep their own direct solve_ivp call in the lattice module
+    monkeypatch.setattr(bohnasa.mean_field.solver, "solve_ivp", lambda *a, **k: _Failed())
+    monkeypatch.setattr(bohnasa.mean_field.lattice, "solve_ivp", lambda *a, **k: _Failed())
     times = np.linspace(0.0, 1.0, 3)
     start = np.array([np.sqrt(2.0), 0.4, 0.3, 0.2])
     with pytest.raises(RuntimeError):
@@ -189,7 +298,7 @@ def test_fixed_points_empty_search(lat2, monkeypatch):
 
 def test_fixed_points_sparse_sign_seeds_for_large_l(monkeypatch):
     # exercise the L > log2(cap) branch where sign patterns are sampled
-    monkeypatch.setattr(bohnasa.mean_field_lattice, "_MAX_EXACT_SEED_PATTERNS", 8)
+    monkeypatch.setattr(bohnasa.mean_field.lattice, "_MAX_EXACT_SEED_PATTERNS", 8)
     lat = MeanFieldLattice(4, 1.35)
     pts = lat.fixed_points(n_random=10)
     assert len(pts) >= 1

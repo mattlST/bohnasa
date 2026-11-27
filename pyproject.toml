@@ -24,7 +24,7 @@ examples = ["matplotlib"]
 Homepage = "https://github.com/mattlST/bohnasa"
 
 [tool.setuptools]
-packages = ["bohnasa", "bohnasa.visualization"]
+packages = ["bohnasa", "bohnasa.mean_field", "bohnasa.visualization"]
 
 [tool.ruff]
 target-version = "py310"
@@ -39,6 +39,7 @@ select = ["E", "F", "I", "UP", "B", "T"]
 [tool.ruff.lint.per-file-ignores]
 # the package API is deliberately re-exported via star imports
 "bohnasa/__init__.py" = ["F401", "F403"]
+"bohnasa/mean_field/__init__.py" = ["F401", "F403", "F405"]
 # demo scripts print on purpose
 "examples/*.py" = ["T201"]
 # benchmark scripts print their measurement tables on purpose

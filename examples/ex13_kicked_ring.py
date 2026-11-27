@@ -43,9 +43,7 @@ from bohnasa import (
     SquaredCommutator,
     fixed_n_coherent_state,
 )
-from bohnasa import (
-    classical_mean_field as mf,
-)
+from bohnasa.mean_field import dimer as mf
 
 THETA = 1.35  # same unstable-saddle angle as ex09/ex10 (for the dimer check)
 

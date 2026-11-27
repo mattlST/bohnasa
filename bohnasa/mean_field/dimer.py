@@ -6,21 +6,32 @@ the closed-form dimer (L = 2) results - fixed points, stability exponent,
 flow - which serve as the exact reference line for the quantum growth
 rates of :class:`bohnasa.SquaredCommutator`; the general L-site engine,
 of which the dimer is the L = 2 special case, is
-:class:`bohnasa.MeanFieldLattice` in :mod:`bohnasa.mean_field_lattice`.
+:class:`bohnasa.MeanFieldLattice` in :mod:`bohnasa.mean_field.lattice`.
 
-Dimer convention: quarter-circle coupling ``J = cos(theta)``,
-``U = 2 sin(theta)/N``, so the classical flow is ``N``-independent. The
-two-mode canonical pair ``{phi, s} = 2/N`` (both modes contribute) sets the
-factor 2 in the flow equations.
+The family conventions (phase space, quarter-circle coupling, shell
+normalization, canonical brackets, sample times) are stated once in
+:mod:`bohnasa.mean_field`. Dimer-scoped, ``L = 2`` only: the two-mode
+canonical pair ``{phi, s} = 2/N`` (both modes contribute) sets the factor 2
+in the flow equations, and the quarter-circle coupling is the ``L = 2``
+case ``U = 2 sin(theta)/N`` of the general ``U = sin(theta) * L / N_phys``
+rule, which makes the classical flow ``N``-independent.
 
-Convention, closed forms and the pitchfork structure follow the doctoral
-thesis cited in ``CITATION.cff`` (quarter-circle system, off-phase saddle).
+Closed forms and the pitchfork structure follow the doctoral thesis cited in
+``CITATION.cff`` (quarter-circle system, off-phase saddle).
 """
 
 from typing import Literal
 
 import numpy as np
-from scipy.integrate import solve_ivp
+
+from .solver import (
+    _DEFAULT_ATOL,
+    _DEFAULT_RTOL,
+    check_sample_times,
+    check_solver_knobs,
+    solve_samples,
+)
+from .solver import INTEGRATION_METHODS as _INTEGRATION_METHODS  # noqa: F401  (re-export)
 
 __all__ = [
     "dimer_fixed_points",
@@ -40,16 +51,6 @@ __all__ = [
 # wall by >= 5.5e-2 (measured s0 = 0.9 orbit over t in [0, 20]), so the floor
 # never perturbs the physics anchors.
 _ROOT_FLOOR = 1e-300
-# Default solve_ivp tolerances: the accuracy point the issue #24 anchors were
-# measured at. Pinned references: cross-method agreement <= 6.2e-8 and the
-# monotone rtol-ladder deviations 4.22e-9 ... 4.78e-3
-# (tests/unit/test_mean_field_flow.py), and the ODE-perturbation-slope floor
-# 3.34e-4, bit-identical across the CI scipy matrix
-# (tests/physics/test_otoc_physics.py). Loosen both only with a re-measured
-# anchor; they are caller-adjustable keyword arguments for speed/accuracy
-# trades.
-_DEFAULT_RTOL = 1e-10
-_DEFAULT_ATOL = 1e-12
 # Realness tolerance for the initial pair (s, phi): accepts complex input
 # carrying only round-off imaginary parts (measured <= 2.8e-17 for FFT
 # round-trips) and rejects physical-scale ones; a 1e-3j initial is pinned
@@ -133,9 +134,6 @@ def dimer_jacobian(theta: float, s: float, phi: float) -> np.ndarray:
     )
 
 
-_INTEGRATION_METHODS = ("DOP853", "RK23", "RK45", "Radau", "BDF", "LSODA")
-
-
 def mean_field_flow(
     theta: float,
     initial: tuple[float, float],
@@ -154,8 +152,9 @@ def mean_field_flow(
     initial : tuple of float
         Starting ``(s, phi)``.
     times : numpy.ndarray
-        Sample times (need not be sorted; duplicates allowed). Times at or
-        below zero report the initial state: the flow starts at ``t = 0``.
+        Sample times (need not be sorted; duplicates allowed). The flow
+        starts at ``max(0, min(times))`` with the initial pair at that time;
+        times at or below it report the initial state.
     method : str, keyword-only, default "DOP853"
         Integration method, one of ``"DOP853"``, ``"RK23"``, ``"RK45"``,
         ``"Radau"``, ``"BDF"``, ``"LSODA"`` (handed to ``solve_ivp``).
@@ -195,23 +194,17 @@ def mean_field_flow(
     >>> float(np.abs(other - traj).max()) < 1e-6
     True
     """
-    times = np.asarray(times, dtype=float)
-    if times.ndim != 1 or times.size == 0:
-        raise ValueError("mean_field_flow: times must be a non-empty 1D array")
-    if not np.all(np.isfinite(times)):
-        raise ValueError("mean_field_flow: times must be finite")
-    if method not in _INTEGRATION_METHODS:
-        raise ValueError(f"mean_field_flow: method must be one of {_INTEGRATION_METHODS}")
-    if not (np.isfinite(rtol) and rtol > 0.0 and np.isfinite(atol) and atol > 0.0):
-        raise ValueError("mean_field_flow: rtol and atol must be positive and finite")
+    times = check_sample_times(times, prefix="mean_field_flow")
+    check_solver_knobs(method, rtol, atol, prefix="mean_field_flow")
     y0 = np.asarray(initial, dtype=complex).ravel()
     if y0.size != 2 or np.abs(y0.imag).max() > _REAL_INPUT_TOL:
         raise ValueError("mean_field_flow: initial must be a real pair (s, phi)")
     s0, phi0 = float(y0[0].real), float(y0[1].real)
+    start = max(0.0, float(times.min()))
     order = np.argsort(times)
     targets = times[order]
     out = np.empty((len(times), 2))
-    future = targets > 0.0
+    future = targets > start
     out[order[~future]] = (s0, phi0)
     if np.any(future):
         # DOP853 (issue #24): adaptive high-order integration of the smooth
@@ -227,16 +220,15 @@ def mean_field_flow(
             ds, dphi = _mf_fields(float(y[0]), float(y[1]), theta)
             return np.array([ds, dphi])
 
-        sol = solve_ivp(
+        samples = solve_samples(
             rhs,
-            (0.0, float(targets[-1])),
             np.array([s0, phi0]),
-            t_eval=unique,
+            (start, float(targets[-1])),
+            unique,
             method=method,
             rtol=rtol,
             atol=atol,
+            prefix="mean_field_flow",
         )
-        if not sol.success:
-            raise RuntimeError(f"mean_field_flow: integration failed: {sol.message}")
-        out[order[future]] = sol.y.T[inverse]
+        out[order[future]] = samples[inverse]
     return out

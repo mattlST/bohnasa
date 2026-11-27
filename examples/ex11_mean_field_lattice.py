@@ -13,7 +13,7 @@ exponent of a generic orbit is computed by three INDEPENDENT algorithms
 (Benettin's tangent-flow renormalization, the QR method and a literal
 two-trajectory separation) - agreement between them is the numerical
 evidence, the dimer saddle exponent the analytic one. Conventions are
-stated once in ``bohnasa/mean_field_lattice.py`` (thesis Sec. 10.1,
+stated once in ``bohnasa/mean_field/__init__.py`` (thesis Sec. 10.1,
 App. A.1).
 """
 
@@ -22,13 +22,13 @@ import numpy as np
 import scipy.integrate as si
 
 from bohnasa import MeanFieldLattice
-from bohnasa import classical_mean_field as mf
+from bohnasa.mean_field import dimer as mf
 
 THETA = 1.35  # above the dimer pitchfork tan(theta) = 2
 
 
 def embed(s: float, phi: float) -> np.ndarray:
-    """Dimer (s, phi) of the classical_mean_field module into lattice
+    """Dimer (s, phi) of the mean_field.dimer module into lattice
     coordinates z = (q0, q1, p0, p1) at L = 2 (occupation shell = 2)."""
     n0, n1 = 1.0 + s, 1.0 - s
     q = np.sqrt(2.0) * np.array([np.sqrt(n0) * np.cos(-phi / 2), np.sqrt(n1) * np.cos(phi / 2)])
@@ -65,7 +65,7 @@ print(f"  saddle exponent {eig_lattice:.10f} vs dimer_lambda {mf.dimer_lambda(TH
 assert abs(eig_lattice - mf.dimer_lambda(THETA)) < 1e-7
 
 # orbit-level check against a tight-tolerance integration of the dimer
-# sphere equations (the closed forms of the classical_mean_field docstring)
+# sphere equations (the closed forms of the mean_field.dimer docstring)
 c, u = np.cos(THETA), np.sin(THETA)
 
 

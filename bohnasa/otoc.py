@@ -20,7 +20,7 @@ Boltzmann-weighted contraction over the energy eigenbasis - still no
 Liouville-space assembly. ``curve`` and ``commuted`` remain pure-state
 probes; generic (non-Gibbs) density-matrix evolution is out of scope.
 The classical reference line for the growth rates is
-:mod:`bohnasa.classical_mean_field`.
+:mod:`bohnasa.mean_field.dimer`.
 """
 
 import numpy as np

@@ -61,7 +61,7 @@ update the comment in the same commit. The constants fall into two classes:
 **(a) Tested invariants** - changing the value flips a pinned test or doctest;
 a change is only acceptable together with the corresponding test update:
 
-- `mean_field.dimer._DEFAULT_RTOL` / `._DEFAULT_ATOL` - the issue #24
+- `mean_field.solver._DEFAULT_RTOL` / `._DEFAULT_ATOL` - the issue #24
   anchor point (`tests/unit/test_mean_field_flow.py` method-agreement and
   rtol-ladder margins; `tests/physics/test_otoc_physics.py` 3.34e-4 slope floor).
 - `mean_field.dimer._REAL_INPUT_TOL`, `mean_field.lattice._STATE_IMAG_TOL`

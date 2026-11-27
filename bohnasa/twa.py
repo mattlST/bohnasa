@@ -31,25 +31,22 @@ so adoption needs only a three-method shim; until then passing it to
 protocol path itself is exercised by the closed-form ``ShiftEngine``
 test engine in ``tests/unit/test_twa.py``.
 
-Phase space and hbar bookkeeping. Following
-:mod:`bohnasa.mean_field.lattice`, ``phi_j = (q_j + i p_j) / sqrt(2)``
-with occupations ``n_j = |phi_j|^2`` on the engine shell
-``sum_j n_j = N = L`` (unit filling) and the canonical bracket
-``{q_j, p_k} = delta_jk`` (symplectic matrix ``Omega = [[0, I], [-I, 0]]``,
-``flow = Omega grad H``). The quantum model the engine approximates has
-``N_phys`` bosons with ``[b_j, b_k^dag] = delta_jk``; density-scaled
+Phase space and hbar bookkeeping. The family's phase-space, shell-
+normalization, coupling and canonical-bracket conventions are stated once
+in :mod:`bohnasa.mean_field`; this sampler works in the engine gauge
+``N_phys = L`` (unit filling). The quantum model the engine approximates
+has ``N_phys`` bosons with ``[b_j, b_k^dag] = delta_jk``; density-scaled
 amplitudes ``psi_j = b_j / sqrt(N_phys)`` carry the Moyal expansion
 parameter
 
     hbar_eff = 1 / N_phys        ({psi_j, psi_k^dag} = -i / N_phys),
 
-the same parameter the reduced dimer bracket ``{phi, s} = 2 / N`` of
-:mod:`bohnasa.mean_field.dimer` encodes. The engine fixes the gauge
-``N_phys = L`` (its quarter-circle coupling ``J = cos(theta)``,
-``U = sin(theta) * L / N_phys`` makes the flow identical for every ``N_phys``
-after the density rescaling ``phi_j = sqrt(L / N_phys) alpha_j`` of the
-physical Wigner amplitudes ``alpha_j`` of ``b_j``), so the engine-variable
-Moyal unit is
+the same parameter the reduced dimer bracket ``{phi, s} = 2 / N`` encodes
+in the ``L = 2`` special case. The general coupling
+``U = sin(theta) * L / N_phys`` makes the flow identical for every
+``N_phys`` after the density rescaling
+``phi_j = sqrt(L / N_phys) alpha_j`` of the physical Wigner amplitudes
+``alpha_j`` of ``b_j``, so the engine-variable Moyal unit is
 
     hbar_M = L * hbar_eff = L / N_phys,     (engine shell: hbar_M = 1).
 

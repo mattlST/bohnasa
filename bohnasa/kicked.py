@@ -52,8 +52,10 @@ The map is the same kick-then-hop Lie-Trotter split as the quantum step: kick
 alpha`` - both sub-flows are exact for their factor, so the local error is the
 O(tau^2) commutator defect of Trotterization, not of the representation.
 
-Dimer dictionary (``L = 2``). With ``s = (n_0 - n_1) / N``, ``N = n_0 + n_1``
-and ``phi = varphi_1 - varphi_0``, the tau -> 0 limit of the map is the flow
+Dimer dictionary (``L = 2``). The family conventions are stated once in
+:mod:`bohnasa.mean_field`; in this ``L = 2`` special case, with
+``s = (n_0 - n_1) / N``, ``N = n_0 + n_1`` and
+``phi = varphi_1 - varphi_0``, the tau -> 0 limit of the map is the flow
 of :func:`bohnasa.mean_field.dimer.mean_field_flow` in its quarter-circle
 coordinates ``J = cos(theta)``, ``U = 2 sin(theta) / N`` (canonical bracket
 ``{phi, s} = 2 / N``). The sign of the relative phase is forced by the

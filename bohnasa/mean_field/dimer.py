@@ -8,13 +8,16 @@ rates of :class:`bohnasa.SquaredCommutator`; the general L-site engine,
 of which the dimer is the L = 2 special case, is
 :class:`bohnasa.MeanFieldLattice` in :mod:`bohnasa.mean_field.lattice`.
 
-Dimer convention: quarter-circle coupling ``J = cos(theta)``,
-``U = 2 sin(theta)/N``, so the classical flow is ``N``-independent. The
-two-mode canonical pair ``{phi, s} = 2/N`` (both modes contribute) sets the
-factor 2 in the flow equations.
+The family conventions (phase space, quarter-circle coupling, shell
+normalization, canonical brackets, sample times) are stated once in
+:mod:`bohnasa.mean_field`. Dimer-scoped, ``L = 2`` only: the two-mode
+canonical pair ``{phi, s} = 2/N`` (both modes contribute) sets the factor 2
+in the flow equations, and the quarter-circle coupling is the ``L = 2``
+case ``U = 2 sin(theta)/N`` of the general ``U = sin(theta) * L / N_phys``
+rule, which makes the classical flow ``N``-independent.
 
-Convention, closed forms and the pitchfork structure follow the doctoral
-thesis cited in ``CITATION.cff`` (quarter-circle system, off-phase saddle).
+Closed forms and the pitchfork structure follow the doctoral thesis cited in
+``CITATION.cff`` (quarter-circle system, off-phase saddle).
 """
 
 from typing import Literal

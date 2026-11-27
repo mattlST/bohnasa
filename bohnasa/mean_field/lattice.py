@@ -3,25 +3,11 @@
 This module provides the classical mean-field flow of the lattice
 Bose-Hubbard model for arbitrary ``L``; the closed-form dimer in
 :mod:`bohnasa.mean_field.dimer` is the ``L = 2`` special case, pinned by
-reduction tests. Conventions below are stated once here and follow the
-doctoral thesis cited in ``CITATION.cff`` (Sec. 10.1 and App. A.1).
-
-Phase space. A state is the real vector ``z = (q_0, ..., q_{L-1}, p_0, ...,
-p_{L-1})`` of length ``2L``; the mean-field amplitudes are
-``phi_j = (q_j + i p_j) / sqrt(2)`` with occupations
-``n_j = |phi_j|^2 = (q_j^2 + p_j^2) / 2``.
-
-Coupling. Quarter-circle parameterization ``J = cos(theta)``,
-``U = sin(theta) * L / N_phys`` in the standard-form quantum model
-``H = -J sum_<jk> (c^dag_j c_k + h.c.) + (U/2) sum_j n_j (n_j - 1)``
-(``Hamiltonian`` translation: ``onsite_u = U / 2``), so the flow written
-for density-scaled amplitudes ``phi_j = sqrt(L / N_phys) * alpha_j`` is
-independent of the total particle number ``N_phys``; the norm is then a
-gauge choice and this engine fixes unit filling ``N_phys = L``
-(occupation shell ``sum_j n_j = L``, where ``U = sin(theta)``). The dimer
-formula ``U = 2 sin(theta) / N`` is its ``L = 2`` special case only.
-With ``c = cos(theta)`` and
-``u = sin(theta)`` the Hamiltonian is
+reduction tests. Phase space, quarter-circle coupling, shell normalization,
+canonical brackets and sample times are stated once in
+:mod:`bohnasa.mean_field` and pinned by the tests; this module uses them on
+the unit-filling engine shell ``N_phys = L`` (so ``U = sin(theta)``). With
+``c = cos(theta)`` and ``u = sin(theta)`` the Hamiltonian is
 
     H = -c * sum_j (q_j q_{j+1} + p_j p_{j+1})
         + (u / 2) * sum_j n_j^2
@@ -36,10 +22,10 @@ variables ``s = (n_0 - n_1) / N``, ``phi = arg(phi_1) - arg(phi_0)``,
 canonical bracket ``{phi, s} = 2 / N`` and per-particle Hamiltonian
 ``h(s, phi) = H / N`` are reproduced exactly (see the reduction tests).
 
-Flow. Hamilton's equations ``dz/dt = Omega grad H`` with the standard
-symplectic matrix ``Omega = [[0, I], [-I, 0]]`` on the ``(q, p)`` layout,
-equivalently ``i dphi_j/dt = dH / dconjugate(phi_j)`` (Gross-Pitaevskii /
-DNLS). Both ``H`` and the norm are conserved along exact solutions; the
+Flow. Hamilton's equations with the family canonical bracket (stated once
+in :mod:`bohnasa.mean_field`), equivalently
+``i dphi_j/dt = dH / dconjugate(phi_j)`` (Gross-Pitaevskii / DNLS). Both
+``H`` and the norm are conserved along exact solutions; the
 analytic Jacobian ``D(Omega grad H) = Omega Hess H`` is supplied to
 ``scipy.integrate.solve_ivp`` (default ``method="Radau"``).
 
@@ -154,7 +140,7 @@ class MeanFieldLattice:
     theta : float
         Quarter-circle coupling angle, ``J = cos(theta)``,
         ``U = sin(theta) * L / N_phys`` (``= sin(theta)`` on the engine
-        shell ``N_phys = L``); see the module docstring.
+        shell ``N_phys = L``); see :mod:`bohnasa.mean_field`.
     mu : float, default 0.0
         Chemical-potential-like shift; for uniform ``mu`` it only rotates
         the global phase, leaving relative dynamics unchanged.

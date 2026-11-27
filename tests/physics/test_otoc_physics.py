@@ -18,8 +18,8 @@ import pytest
 import scipy.linalg as sla
 
 import bohnasa
-from bohnasa import classical_mean_field as mf
 from bohnasa import otoc as oc
+from bohnasa.mean_field import dimer as mf
 
 THETA = 1.35  # unstable-saddle regime of the dimer, theta* = 1.339 nearby
 

@@ -14,7 +14,7 @@ difference 9.723121863203232e-09, bit-identical on every tested stack.
 import numpy as np
 import pytest
 
-from bohnasa import classical_mean_field as mf
+from bohnasa.mean_field import dimer as mf
 
 THETA = 1.35  # unstable-saddle regime, same anchor point as the physics suite
 

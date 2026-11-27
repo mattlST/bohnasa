@@ -22,9 +22,7 @@ from bohnasa import (
     SquaredCommutator,
     fixed_n_coherent_state,
 )
-from bohnasa import (
-    classical_mean_field as mf,
-)
+from bohnasa.mean_field import dimer as mf
 
 THETA = 1.35  # unstable-saddle regime, same quarter-circle angle as ex09/ex10
 

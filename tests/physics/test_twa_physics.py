@@ -33,9 +33,9 @@ import pytest
 
 import bohnasa
 from bohnasa import MeanFieldLattice, StateObservables, TruncatedWigner
-from bohnasa import classical_mean_field as mf
 from bohnasa import otoc as oc
 from bohnasa import twa as twa_module
+from bohnasa.mean_field import dimer as mf
 from bohnasa.twa import _grad_symbol, _omega_apply
 
 THETA = 1.35  # unstable-saddle dimer regime (issue #24/#28 anchor point)

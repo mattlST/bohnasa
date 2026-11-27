@@ -32,7 +32,7 @@ protocol path itself is exercised by the closed-form ``ShiftEngine``
 test engine in ``tests/unit/test_twa.py``.
 
 Phase space and hbar bookkeeping. Following
-:mod:`bohnasa.mean_field_lattice`, ``phi_j = (q_j + i p_j) / sqrt(2)``
+:mod:`bohnasa.mean_field.lattice`, ``phi_j = (q_j + i p_j) / sqrt(2)``
 with occupations ``n_j = |phi_j|^2`` on the engine shell
 ``sum_j n_j = N = L`` (unit filling) and the canonical bracket
 ``{q_j, p_k} = delta_jk`` (symplectic matrix ``Omega = [[0, I], [-I, 0]]``,
@@ -44,7 +44,7 @@ parameter
     hbar_eff = 1 / N_phys        ({psi_j, psi_k^dag} = -i / N_phys),
 
 the same parameter the reduced dimer bracket ``{phi, s} = 2 / N`` of
-:mod:`bohnasa.classical_mean_field` encodes. The engine fixes the gauge
+:mod:`bohnasa.mean_field.dimer` encodes. The engine fixes the gauge
 ``N_phys = L`` (its quarter-circle coupling ``J = cos(theta)``,
 ``U = sin(theta) * L / N_phys`` makes the flow identical for every ``N_phys``
 after the density rescaling ``phi_j = sqrt(L / N_phys) alpha_j`` of the

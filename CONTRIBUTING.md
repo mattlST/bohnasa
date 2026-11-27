@@ -61,23 +61,23 @@ update the comment in the same commit. The constants fall into two classes:
 **(a) Tested invariants** - changing the value flips a pinned test or doctest;
 a change is only acceptable together with the corresponding test update:
 
-- `classical_mean_field._DEFAULT_RTOL` / `._DEFAULT_ATOL` - the issue #24
+- `mean_field.dimer._DEFAULT_RTOL` / `._DEFAULT_ATOL` - the issue #24
   anchor point (`tests/unit/test_mean_field_flow.py` method-agreement and
   rtol-ladder margins; `tests/physics/test_otoc_physics.py` 3.34e-4 slope floor).
-- `classical_mean_field._REAL_INPUT_TOL`, `mean_field_lattice._STATE_IMAG_TOL`
+- `mean_field.dimer._REAL_INPUT_TOL`, `mean_field.lattice._STATE_IMAG_TOL`
   - the `1e-3j` rejection in `tests/unit/test_otoc.py::test_mean_field_flow_rejects_complex_initial`
   and the state-validation tests bracket this value.
-- `classical_mean_field._ROOT_FLOOR` - wall guard, provably inactive away
+- `mean_field.dimer._ROOT_FLOOR` - wall guard, provably inactive away
   from |s| = 1 exactly; measured bounded-orbit margin to the wall is
   >= 5.5e-2, so the physics anchors are bit-identical with and without it.
-- `mean_field_lattice._DEFAULT_SOLVER_RTOL` / `._DEFAULT_SOLVER_ATOL` -
+- `mean_field.lattice._DEFAULT_SOLVER_RTOL` / `._DEFAULT_SOLVER_ATOL` -
   trajectory energy-drift doctest bound and the four-digit Lyapunov doctests.
-- `mean_field_lattice._SEED_FP_SHELL` / `._SEED_LYAPUNOV_V0` - the
+- `mean_field.lattice._SEED_FP_SHELL` / `._SEED_LYAPUNOV_V0` - the
   `fixed_points` doctest shape (L = 2) and the four-digit `lyapunov` doctests
   track these exact streams; `._SEED_LARGE_L_SIGNS` deterministically drives
   the sparse-sign branch exercised by
   `tests/unit/test_mean_field_lattice.py::test_fixed_points_sparse_sign_seeds_for_large_l`.
-- `mean_field_lattice._DEFAULT_FP_TOL` / `._ROOT_XTOL` / `._FP_DEDUP_TOL` /
+- `mean_field.lattice._DEFAULT_FP_TOL` / `._ROOT_XTOL` / `._FP_DEDUP_TOL` /
   `._FP_SHELL_TOL` - they gate which roots enter the found-point set pinned
   by the `fixed_points` doctests and `tests/unit/test_mean_field_lattice.py`;
   each sits in a measured gap between accepted and rejected populations.
@@ -111,10 +111,10 @@ citation in the constant's comment, no test update needed:
   (dim 2925, 4096-time curve): a memory ceiling, not a throughput knob.
 - `krylov.MAX_REORTH_ITERATIONS` - pure safety cap: measured convergence is
   the 1st pass, so 20 is headroom, not a tuned boundary.
-- `mean_field_lattice._DEFAULT_LYAPUNOV_DELTA` - exponent invariant over
+- `mean_field.lattice._DEFAULT_LYAPUNOV_DELTA` - exponent invariant over
   delta in [1e-4, 1e-12] (measured identical to 8 digits).
-- `mean_field_lattice._DEFAULT_FP_N_RANDOM`,
-  `mean_field_lattice._MAX_EXACT_SEED_PATTERNS`, `mean_field_lattice._ROOT_MAXFEV`
+- `mean_field.lattice._DEFAULT_FP_N_RANDOM`,
+  `mean_field.lattice._MAX_EXACT_SEED_PATTERNS`, `mean_field.lattice._ROOT_MAXFEV`
   - coverage/runtime trade-offs of the heuristic fixed-point search (the found
   set grows with them; no doctest at L >= 3 pins completeness).
 

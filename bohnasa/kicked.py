@@ -10,7 +10,7 @@ One drive period of the model alternates two delta-kicks of duration
 the normal-ordered Bose-Hubbard split with the bond convention of
 :func:`bohnasa.operators.bond_pairs` (including its deliberate ``L = 2`` PBC
 double counting, which makes the dimer hopping ``2J`` - the ex10 /
-``classical_mean_field`` convention). The rightmost factor acts first: every
+``mean_field.dimer`` convention). The rightmost factor acts first: every
 basis state first accumulates its on-site phases ``exp(-i tau (U/2) n(n-1))``,
 then hops. This is the ordering :class:`bohnasa.SquaredCommutator` uses through
 :meth:`~bohnasa.SquaredCommutator.from_propagator`: the Floquet Heisenberg
@@ -54,7 +54,7 @@ O(tau^2) commutator defect of Trotterization, not of the representation.
 
 Dimer dictionary (``L = 2``). With ``s = (n_0 - n_1) / N``, ``N = n_0 + n_1``
 and ``phi = varphi_1 - varphi_0``, the tau -> 0 limit of the map is the flow
-of :func:`bohnasa.classical_mean_field.mean_field_flow` in its quarter-circle
+of :func:`bohnasa.mean_field.dimer.mean_field_flow` in its quarter-circle
 coordinates ``J = cos(theta)``, ``U = 2 sin(theta) / N`` (canonical bracket
 ``{phi, s} = 2 / N``). The sign of the relative phase is forced by the
 Josephson current: ``ds/dt = -4 J sqrt(1 - s^2) sin(phi)`` requires
@@ -68,7 +68,7 @@ named boundary condition (both kicks are symmetric), and falls back to a dense
 ``dim x dim`` eigendecomposition otherwise.
 
 See :mod:`bohnasa.otoc` for the OTOC machinery the propagator feeds, and
-:mod:`bohnasa.classical_mean_field` / :mod:`bohnasa.mean_field_lattice` for
+:mod:`bohnasa.mean_field.dimer` / :mod:`bohnasa.mean_field.lattice` for
 the continuous-time classical references.
 """
 

@@ -164,7 +164,7 @@ def test_solver_failure_is_surfaced(lat2, monkeypatch):
         message = "stubbed failure"
         y = np.zeros((4, 1))
 
-    monkeypatch.setattr(bohnasa.mean_field_lattice, "solve_ivp", lambda *a, **k: _Failed())
+    monkeypatch.setattr(bohnasa.mean_field.lattice, "solve_ivp", lambda *a, **k: _Failed())
     times = np.linspace(0.0, 1.0, 3)
     start = np.array([np.sqrt(2.0), 0.4, 0.3, 0.2])
     with pytest.raises(RuntimeError):
@@ -189,7 +189,7 @@ def test_fixed_points_empty_search(lat2, monkeypatch):
 
 def test_fixed_points_sparse_sign_seeds_for_large_l(monkeypatch):
     # exercise the L > log2(cap) branch where sign patterns are sampled
-    monkeypatch.setattr(bohnasa.mean_field_lattice, "_MAX_EXACT_SEED_PATTERNS", 8)
+    monkeypatch.setattr(bohnasa.mean_field.lattice, "_MAX_EXACT_SEED_PATTERNS", 8)
     lat = MeanFieldLattice(4, 1.35)
     pts = lat.fixed_points(n_random=10)
     assert len(pts) >= 1

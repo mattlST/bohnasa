@@ -2,7 +2,7 @@
 
 This module provides the classical mean-field flow of the lattice
 Bose-Hubbard model for arbitrary ``L``; the closed-form dimer in
-:mod:`bohnasa.classical_mean_field` is the ``L = 2`` special case, pinned by
+:mod:`bohnasa.mean_field.dimer` is the ``L = 2`` special case, pinned by
 reduction tests. Conventions below are stated once here and follow the
 doctoral thesis cited in ``CITATION.cff`` (Sec. 10.1 and App. A.1).
 
@@ -31,7 +31,7 @@ where ``mu`` acts as a chemical-potential-like shift. The neighbour sums are
 roll sums modulo ``L`` for ``connections="pbc"`` (default) and clipped at the
 chain ends for ``connections="obc"``. A two-site PBC ring visits its single
 bond from both directions, so the bond counts twice; that is precisely the
-dimer convention of :mod:`bohnasa.classical_mean_field`, whose reduced
+dimer convention of :mod:`bohnasa.mean_field.dimer`, whose reduced
 variables ``s = (n_0 - n_1) / N``, ``phi = arg(phi_1) - arg(phi_0)``,
 canonical bracket ``{phi, s} = 2 / N`` and per-particle Hamiltonian
 ``h(s, phi) = H / N`` are reproduced exactly (see the reduction tests).
@@ -115,7 +115,7 @@ _DEFAULT_FP_N_RANDOM = 60
 _DEFAULT_FP_TOL = 1e-9
 # Realness tolerance of _state(): accepts complex input with round-off
 # imaginary parts (measured <= 2.8e-17 for FFT round-trips), rejects
-# physical-scale ones (same regime as classical_mean_field._REAL_INPUT_TOL).
+# physical-scale ones (same regime as bohnasa.mean_field.dimer._REAL_INPUT_TOL).
 _STATE_IMAG_TOL = 1e-12
 # Duplicate-cluster radius of fixed_points(). Measured at L = 4: seeds
 # converging to the same point agree to <= 8.3e-15 (Chebyshev), while the
@@ -160,7 +160,7 @@ class MeanFieldLattice:
         the global phase, leaving relative dynamics unchanged.
     connections : {"pbc", "obc"}, default "pbc"
         Neighbour convention; see the module docstring. The dimer reduction
-        to :mod:`bohnasa.classical_mean_field` holds for ``"pbc"``.
+        to :mod:`bohnasa.mean_field.dimer` holds for ``"pbc"``.
 
     Examples
     --------

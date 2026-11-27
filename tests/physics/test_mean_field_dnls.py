@@ -18,7 +18,7 @@ import pytest
 from scipy.integrate import solve_ivp
 
 import bohnasa
-from bohnasa import classical_mean_field as mf
+from bohnasa.mean_field import dimer as mf
 
 THETA = 1.35  # above the pitchfork tan(theta) = 2
 
@@ -44,7 +44,7 @@ def project_dimer(z: np.ndarray) -> tuple[float, float]:
 
 
 def dimer_reference_orbit(theta: float, y0: tuple[float, float], times: np.ndarray) -> np.ndarray:
-    """The dimer sphere flow of the classical_mean_field module, integrated
+    """The dimer sphere flow of the mean_field.dimer module, integrated
     independently here from the module docstring's h(s, phi) by hand."""
     c, u = np.cos(theta), np.sin(theta)
 

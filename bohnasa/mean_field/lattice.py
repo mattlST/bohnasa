@@ -395,6 +395,7 @@ class MeanFieldLattice:
         self,
         z0: Sequence[float] | np.ndarray,
         times: Sequence[float] | np.ndarray,
+        *,
         method: str = "Radau",
         rtol: float = _DEFAULT_SOLVER_RTOL,
         atol: float = _DEFAULT_SOLVER_ATOL,
@@ -409,11 +410,22 @@ class MeanFieldLattice:
             Sample times (need not be sorted; duplicates allowed). The flow
             starts at ``max(0, min(times))`` with ``z0`` at that time; times
             at or below it report ``z0``.
-        method : str, default "Radau"
-            Implicit ``solve_ivp`` scheme (matches the reference engine the
-            dimer numbers were checked against); ``"DOP853"`` also works.
-        rtol, atol : float
-            Solver tolerances.
+        method : str, keyword-only, default "Radau"
+            Integration scheme, one of ``"DOP853"``, ``"RK23"``, ``"RK45"``,
+            ``"Radau"``, ``"BDF"``, ``"LSODA"``. Radau is the anchor-pinned
+            reference; implicit schemes receive the analytic Jacobian,
+            explicit Runge-Kutta schemes do not. At the default tolerances
+            all listed schemes agree with Radau to better than 3e-5 on
+            stable, regular and chaotic probe orbits up to ``t = 40``
+            (measured max state deviation 3.8e-09 ... 2.9e-05); chaotic
+            agreement degrades with the horizon (RK23/BDF 7.1e-07 at
+            ``t = 20``, 3.2e-06 at ``t = 40``).
+        rtol : float, keyword-only, default 1e-9
+            Relative integration tolerance handed to ``solve_ivp``; the
+            default is the accuracy point pinned by the trajectory and
+            Lyapunov anchors.
+        atol : float, keyword-only, default 1e-12
+            Absolute integration tolerance (same rationale).
 
         Returns
         -------

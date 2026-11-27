@@ -103,6 +103,94 @@ def test_trajectory_accepts_explicit_method(lat4):
     assert np.abs(a - b).max() < 1e-6  # same flow, different quadrature
 
 
+def test_trajectory_default_knobs_match_explicit(lat4):
+    times = np.linspace(0.0, 2.0, 21)
+    z0 = np.ones(8)
+    assert np.array_equal(
+        lat4.trajectory(z0, times),
+        lat4.trajectory(z0, times, method="Radau", rtol=1e-9, atol=1e-12),
+    )
+
+
+@pytest.mark.parametrize(
+    "kwargs",
+    [
+        {"method": "verlet"},
+        {"rtol": -1.0},
+        {"rtol": 0.0},
+        {"rtol": np.nan},
+        {"atol": -1.0},
+        {"atol": np.nan},
+    ],
+)
+def test_trajectory_rejects_bad_knobs(lat2, kwargs):
+    with pytest.raises(ValueError, match="trajectory: "):
+        lat2.trajectory([1.4, 0.6, 0.1, 0.2], np.linspace(0.0, 1.0, 3), **kwargs)
+
+
+def test_trajectory_solver_knobs_are_keyword_only(lat2):
+    with pytest.raises(TypeError):
+        lat2.trajectory([1.4, 0.6, 0.1, 0.2], np.linspace(0.0, 1.0, 3), "DOP853")
+
+
+def test_trajectory_jacobian_dispatch(lat2, monkeypatch):
+    """Implicit schemes get the analytic Jacobian, explicit ones never do."""
+    seen: dict[str, bool] = {}
+
+    class _Ok:
+        success = True
+        message = ""
+        y = np.zeros((4, 1))
+
+    def fake(_fun, _t_span, _y0, **kwargs):
+        seen["jac"] = "jac" in kwargs
+        return _Ok()
+
+    monkeypatch.setattr(bohnasa.mean_field.solver, "solve_ivp", fake)
+    times = np.array([0.0, 1.0])
+    for method, expected in (
+        ("Radau", True),
+        ("BDF", True),
+        ("LSODA", True),
+        ("RK23", False),
+        ("RK45", False),
+        ("DOP853", False),
+    ):
+        lat2.trajectory(np.ones(4), times, method=method)
+        assert seen["jac"] is expected
+
+
+def test_trajectory_methods_agree_with_default():
+    """Cross-method bands measured with OMP_NUM_THREADS=1 (issue #46).
+
+    Worst observed deviation across the stable L2, regular L4 and chaotic
+    L4 probes: 2.86e-05 (BDF, regular L4 theta = pi/2 orbit); the band is
+    set at 1e-4.
+    """
+    # L = 2 dimer embedding of (s, phi) = (0.3, 2.0)
+    s, phi = 0.3, 2.0
+    n0, n1 = 1.0 + s, 1.0 - s
+    q = [np.sqrt(n0) * np.cos(-phi / 2), np.sqrt(n1) * np.cos(phi / 2)]
+    p = [np.sqrt(n0) * np.sin(-phi / 2), np.sqrt(n1) * np.sin(phi / 2)]
+    z_stable = np.sqrt(2.0) * np.array(q + p)
+    z_reg = np.array([1.1, 0.9, 0.3, 0.5, 0.7, 0.2, 0.4, 0.6])
+    z_reg *= np.sqrt(8.0) / np.linalg.norm(z_reg)
+    z_ch = np.array([1.0, 1.5, 0.7, 1.3, 0.4, -0.2, 0.9, 0.1])
+    z_ch *= np.sqrt(8.0) / np.linalg.norm(z_ch)
+    probes = (
+        (2, 1.35, z_stable, 8.0, 801),
+        (4, np.pi / 2, z_reg, 20.0, 201),
+        (4, 1.35, z_ch, 40.0, 401),
+    )
+    for L, theta, z0, t_end, n_pts in probes:
+        lat = MeanFieldLattice(L, theta)
+        times = np.linspace(0.0, t_end, n_pts)
+        base = lat.trajectory(z0, times)
+        for method in ("DOP853", "RK23", "RK45", "BDF", "LSODA"):
+            other = lat.trajectory(z0, times, method=method)
+            assert np.abs(other - base).max() < 1e-4
+
+
 def test_lyapunov_validation(lat4):
     z = np.random.default_rng(0).normal(size=8)
     times = np.linspace(0.0, 4.0, 9)

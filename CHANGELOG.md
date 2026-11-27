@@ -6,6 +6,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Breaking
+- `MeanFieldLattice.trajectory` solver knobs are keyword-only (issue #46):
+  the previously positional `method` argument now raises `TypeError`.
+  Invalid `rtol`/`atol` raise a `ValueError` with the shared
+  `trajectory: ...` message instead of a raw scipy error.
+
+### Added
+- `MeanFieldLattice.trajectory` accepts keyword-only `method`, `rtol` and
+  `atol` (issue #46), mirroring `mean_field_flow`. Defaults stay
+  `"Radau"`, `1e-9` and `1e-12`, so the default path is bit-identical.
+  Implicit schemes (`Radau`, `BDF`, `LSODA`) receive the analytic
+  Jacobian, explicit Runge-Kutta schemes do not. Measured cross-method
+  agreement at the default tolerances: max state deviation `2.86e-05`
+  (BDF, regular `L = 4`, `theta = pi/2` orbit), range `3.8e-09 ...
+  2.9e-05` over stable, regular and chaotic probes up to `t = 40`;
+  chaotic agreement degrades with the horizon.
+
 ### Changed
 - Unified sample-time semantics across the mean-field engines (issue #45):
   `MeanFieldLattice.trajectory` now accepts unsorted and duplicate sample

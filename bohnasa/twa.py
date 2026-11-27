@@ -46,7 +46,7 @@ parameter
 the same parameter the reduced dimer bracket ``{phi, s} = 2 / N`` of
 :mod:`bohnasa.classical_mean_field` encodes. The engine fixes the gauge
 ``N_phys = L`` (its quarter-circle coupling ``J = cos(theta)``,
-``U = 2 sin(theta) / N`` makes the flow identical for every ``N_phys``
+``U = sin(theta) * L / N_phys`` makes the flow identical for every ``N_phys``
 after the density rescaling ``phi_j = sqrt(L / N_phys) alpha_j`` of the
 physical Wigner amplitudes ``alpha_j`` of ``b_j``), so the engine-variable
 Moyal unit is

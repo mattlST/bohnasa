@@ -6,6 +6,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+- Quarter-circle coupling rule in the engine docstrings (issue #60): the
+  general correspondence is `U = sin(theta) * L / N_phys` (`onsite_u = U/2`
+  in `Hamiltonian` terms), not the dimer-only `U = 2 sin(theta)/N`. The
+  `mean_field_lattice` and `twa` module docstrings now state the general
+  rule (dimer-scoped wording in `classical_mean_field` and `kicked` is
+  unchanged and correct), pinned by a general-L GP-correspondence
+  regression test: measured max occupation deviation 3.37e-10 at L = 4,
+  theta = 1.35, while the dimer-only rule deviates by 0.655 (half the
+  interaction). Documentation and tests only - no library behavior changed.
+
 ## [0.1.0] - 2026-11-24
 
 ### Added
